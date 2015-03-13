@@ -11,7 +11,8 @@ class TunnellingDev():
     A tunnelling device is a abstract device gathering client devices or server devices
     """
     
-    PROTO_RDV_SERVER = '10.10.8.41'
+    PROTO_RDV_SERVER = 'localhost'
+    #~ PROTO_RDV_SERVER = '10.10.8.41'
     
     def __init__(self):
         self._rdv_server = TunnellingDev.PROTO_RDV_SERVER
@@ -21,7 +22,7 @@ class TunnellingDev():
         """ Initiate the ssh connection to the RDV server """
         self._ssh_connection = paramiko.SSHClient()
         self._ssh_connection.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self._ssh_connection.connect(self._rdv_server, username='pi', password='raspberry')
+        self._ssh_connection.connect(self._rdv_server, username='cl0001', password='cl0001')
 
     def rdv_server_disconnect(self):
         """ Close the ssh connection to the RDV server if it is up """
