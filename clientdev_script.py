@@ -13,8 +13,7 @@ class ClientDev(tundev_script.TunnellingDev):
         tundev_script.TunnellingDev.__init__(self)
 
     def run_cmd(self, command):
-        """run
-        Execute this command on the remote server"""
+        """ Execute this command on the remote server """
         if command:
             if self._ssh_connection:
                 print('Host: %s'  % (self._rdv_server))
