@@ -4,13 +4,13 @@
 
 from __future__ import print_function
 
-import tunnelling_dev
+import tundev_script
 
-class ClientDev(tunnelling_dev.TunnellingDev):
+class ClientDev(tundev_script.TunnellingDev):
     """ Script to connect to a RDV server from a client dev """
 
     def __init__(self):
-        tunnelling_dev.TunnellingDev.__init__(self)
+        tundev_script.TunnellingDev.__init__(self)
 
     def run_cmd(self, command):
         """run
