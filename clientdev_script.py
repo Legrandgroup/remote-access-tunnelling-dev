@@ -6,11 +6,11 @@ from __future__ import print_function
 
 import tundev_script
 
-class ClientDev(tundev_script.TunnellingDev):
-    """ Script to connect to a RDV server from a client dev """
+class OnsiteDev(tundev_script.TunnellingDev):
+    """ Script to connect to a RDV server from an onsite dev """
 
     def __init__(self):
-        tundev_script.TunnellingDev.__init__(self)
+        super(tundev_script.TunnellingDev, self).__init__()
 
     def run_cmd(self, command):
         """ Execute this command on the remote server """
@@ -25,12 +25,12 @@ class ClientDev(tundev_script.TunnellingDev):
                 print('...Done\n')
 
     def exit(self):
-        """ Terminate the client dev script """
+        """ Terminate the onsite dev script """
         self.rdv_server_disconnect()
 
 if __name__ == '__main__':
-    print('Starting client');
-    client = ClientDev()
-    client.rdv_server_connect()
-    client.run_cmd('echo bla')
-    client.exit()
+    print('Starting onsite dev script');
+    onsite_dev = OnsiteDev()
+    onsite_dev.rdv_server_connect()
+    onsite_dev.run_cmd('echo bla')
+    onsite_dev.exit()
