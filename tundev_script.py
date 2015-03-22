@@ -104,7 +104,7 @@ class TunnellingDev(object):
         supposedly_logged_in = False
         surely_logged_in = False
         
-        index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, 'Permission denied', self._ssh_username + '@.*password: ', self._prompt], timeout=4)
+        index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, 'Permission denied', self._ssh_username + '@.*password: ', self._prompt], timeout=40)
         if self.logger.isEnabledFor(logging.DEBUG):
             self._exp.logfile = sys.stdout    # Log to stdout in DEBUG mode
         else:
