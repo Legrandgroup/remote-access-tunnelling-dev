@@ -383,4 +383,5 @@ class TunnellingDev(object):
                                                     vtun_server_hostname=vtun_server_hostname,
                                                     vtun_server_port=vtun_server_port,
                                                     vtund_exec = vtund_exec,
+                                                    vtund_use_sudo = vtund_use_sudo,
                                                     vtun_connection_timeout = vtun_connection_timeout).to_client_vtun_tunnel_object()

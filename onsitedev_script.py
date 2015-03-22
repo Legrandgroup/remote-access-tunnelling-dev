@@ -18,13 +18,10 @@ progname = os.path.basename(sys.argv[0])
 class OnsiteDev(tundev_script.TunnellingDev):
     """ Script to connect to a RDV server from an onsite dev """
 
-    def __init__(self, username, logger, key_filename = None):
+    def __init__(self, **kwargs):# See TunnellingDev.__init__ for the inherited kwargs
         """ Constructor
-        \param username The username to use with ssh to connect to the RDV server
-        \param key_filename A file containing the private key for key-based ssh authentication
-        \param logger A logging.Logger to use for log messages
         """
-        super(OnsiteDev, self).__init__(username=username, key_filename=key_filename, logger=logger)
+        super(OnsiteDev, self).__init__(**kwargs)
 
     def exit(self):
         """ Terminate the onsite dev script """
@@ -75,6 +72,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     print('Started vtun client as PID ' + str(vtun_client._vtun_pid))
     print('Now sleeping 30s')
     time.sleep(30)
+    print('Slept 30s')
     session_output = vtun_client.get_output()
     session_output = '|' + session_output.replace('\n', '\n|')  # Prefix the whole output with a | character so that dump is easily spotted
     if session_output.endswith('|'):    # Remove the last line that only contains a | character
