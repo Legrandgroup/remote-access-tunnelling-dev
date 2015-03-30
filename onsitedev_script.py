@@ -10,7 +10,7 @@ class OnsiteDev(tundev_script.TunnellingDev):
     """ Script to connect to a RDV server from an onsite dev """
 
     def __init__(self):
-        super(tundev_script.TunnellingDev, self).__init__()
+        super(OnsiteDev, self).__init__()
 
     def run_cmd(self, command):
         """ Execute this command on the remote server """
