@@ -12,6 +12,8 @@ import logging
 
 import tempfile
 
+import ipaddr
+
 import socket, struct, fcntl    # For get_ip()
 
 
@@ -37,21 +39,31 @@ class TunnellingDev(object):
         self.logger = logger
         self.exp_logfile = None # This attribute, if not None, will contain a tempfile.TemporaryFile object where all expect session is stored
     
-    def _get_ip(self, iface = 'eth0'):
+    def _get_ip_network(self, iface = 'eth0'):
         """ Get the IPv4 address of the specified interface
         \param iface The interface to check
-        \return A string containing the four-dotted representation of the IP address
+        \return An ipaddr.IPv4Network object containing the IP address + netmask
         """
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sockfd = sock.fileno()
         SIOCGIFADDR = 0x8915
+        SIOCGIFNETMASK = 0x891b
+        
         ifreq = struct.pack('16sH14s', iface, socket.AF_INET, '\x00'*14)
+        ip = None
+        netmask = None
+        
         try:
-            res = fcntl.ioctl(sockfd, SIOCGIFADDR, ifreq)
+            res_ip = fcntl.ioctl(sockfd, SIOCGIFADDR, ifreq)
+            ip = struct.unpack('16sH2x4s8x', res_ip)[2]
+            ip = socket.inet_ntoa(ip)
+            res_netmask = fcntl.ioctl(sockfd, SIOCGIFNETMASK, ifreq)
+            netmask = struct.unpack('16sH2x4s8x', res_netmask)[2]
+            netmask = socket.inet_ntoa(netmask)
         except:
             return None
-        ip = struct.unpack('16sH2x4s8x', res)[2]
-        return socket.inet_ntoa(ip)
+        
+        return ipaddr.IPv4Network(str(ip) + '/' + str(netmask)) 
     
     def catch_prompt(self, timeout = 2):
         """ Wait for a remote prompt to appear
@@ -156,6 +168,18 @@ class TunnellingDev(object):
         elif string.endswith('\n'):   # Get rid of UNIX-style carriage returns at the end of the string
             string = string[:-1]
         return string
+    
+    def run_set_tunnelling_dev_lan_ip_address(self, ip):
+        """ Run the command set_tunnelling_dev_lan_ip_address on the remote tundev shell
+        \param ip an ipaddr.IPv4Network object or a string containing the IP address and prefix using the CIDR notation, to communicate to the RDV server
+        """
+        self.run_command('set_tunnelling_dev_lan_ip_address ' + str(ip), 2)
+    
+    def send_lan_ip_address_for_iface(self, iface):
+        """ Send the IP addressing for the interface iface to the remote tundev shell
+        \param iface The network interface for which we will extract the IP address
+        """
+        self.run_set_tunnelling_dev_lan_ip_address(self._get_ip_network(iface))
 
     def run_get_tunnel_mode(self):
         """ Run the command get_tunnel_mode on the remote tundev shell
