@@ -139,8 +139,8 @@ class TunnellingDev(object):
         \return The output (mixed stout and stderr) that we got before the new prompt
         """
         if not self._exp is None:
-            self._exp.buffer = ''
-            self._exp.before = ''   # Eat all preceeding input
+            #self._exp.buffer = ''
+            #self._exp.before = ''   # Eat all preceeding input
             self._exp.send(command + '\r')
             self.catch_prompt(timeout=prompt_timeout)
             output = str(self._exp.before)
@@ -186,4 +186,10 @@ class TunnellingDev(object):
         \return The tunnel mode as a string
         """
         return self._strip_trailing_cr_from(self.run_command('get_tunnel_mode', 2))
-        
+    
+    def run_set_tunnelling_dev_uplink_type(self, uplink_type):
+        """ Run the command set_tunnelling_dev_uplink_type on the remote tundev shell
+        \param uplink_type The uplink type as a string (usual values 'lan' or '3g')
+        """
+        self.run_command('set_tunnelling_dev_uplink_type ' + str(uplink_type), 2)
+    
