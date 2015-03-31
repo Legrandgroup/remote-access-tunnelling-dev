@@ -10,17 +10,6 @@ import sys
 
 import logging
 
-# def sigwinch_passthrough (sig, data):
-#     # Check for buggy platforms (see pexpect.setwinsize()).
-#     if 'TIOCGWINSZ' in dir(termios):
-#         TIOCGWINSZ = termios.TIOCGWINSZ
-#     else:
-#         TIOCGWINSZ = 1074295912 # assume
-#     s = struct.pack ("HHHH", 0, 0, 0, 0)
-#     a = struct.unpack ('HHHH', fcntl.ioctl(sys.stdout.fileno(), TIOCGWINSZ , s))
-#     global global_pexpect_instance
-#     global_pexpect_instance.setwinsize(a[0],a[1])
-
 class TunnellingDev(object):
     """ Class representing a tunnelling device
     A tunnelling device is a abstract device gathering client devices or server devices
@@ -28,20 +17,46 @@ class TunnellingDev(object):
     
     PROTO_RDV_SERVER = '10.10.8.11'
     
-    def __init__(self, username, key_filename, logger):
-        """
+    def __init__(self, username, logger, key_filename = None):
+        """ Constructor
+        \param username The username to use with ssh to connect to the RDV server
+        \param key_filename A file containing the private key for key-based ssh authentication
         \param logger A logging.Logger to use for log messages
         """
         self._rdv_server = TunnellingDev.PROTO_RDV_SERVER
-        self._ssh_connection = None
+        #self._ssh_connection = None
         self._ssh_username = username
         self._ssh_key_filename = key_filename
         self._exp = None
         self._prompt = '1001[$] '
         self.logger = logger
+        
+    def catch_prompt(self, timeout = 2):
+        """ Wait for a remote prompt to appear
+        
+        Note: the expected prompt is stored in attribute self._prompt
+        This method will raise exceptions in case of failure
+        \param timeout How long (in secs) are we ready to wait for the prompt
+        """
+        index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, self._prompt], timeout=timeout)
+        if index == 0:    # Timeout
+            self.logger.error("Could not wake up terminal")
+            raise('ConnectionError')
+        elif index == 1:    # EOF
+            self.logger.error("Remote connection closed")
+            raise('ConnectionError')
+        elif index == 2:    # linux_prompt_catchall_regexp a second time
+            pass    # We are now sure we are logged in now
+        
     
     def rdv_server_connect(self):
-        """ Initiate the ssh connection to the RDV server """
+        """ Initiate the ssh connection to the RDV server
+        This method will raise exceptions in case of failure
+        """
+        
+        if not self._ssh_key_filename is None:
+            logger.error('Providing a ssh key filename is not yet supported')
+            raise('SSHKeyFilenameNotSupported')
         self._exp = pexpect.spawn('ssh', ['-oUserKnownHostsFile=/dev/null', '-oStrictHostKeyChecking=no', self._ssh_username + '@' + self._rdv_server])
         supposedly_logged_in = False
         surely_logged_in = False
@@ -51,38 +66,22 @@ class TunnellingDev(object):
             self._exp.logfile = sys.stdout    # Log to stdout in DEBUG mode
         
         if index == 0:
-            if self._exp.isalive():
-                self.logger.info("Supposedly logged in...")
-                if self._exp.buffer:
-                    self.logger.info("Input buffer is:\n'" + self._exp.buffer + "'")
-                self._exp.logfile = None    # Do not log to console anymore , interact will do it
-                supposedly_logged_in = True
-            else:
-                self.logger.error("Remote connection closed")
-                exit(5)
+            self.logger.error("Remote connection closed")
+            raise('ConnectionError')
         elif index == 1:
-            self.logger.error("Permission denied while logging in")
-            raise Exception('PermissionDenied')
+            self.logger.error("Permission denied, public key authentication rejected")
+            raise Exception('PublicKeyNotAccepted')
         elif index == 2:
-            self.logger.error("Incorrect password")
-            raise Exception('BadPassword')
+            self.logger.error("Username/password required, public key authentication rejected")
+            raise Exception('PublicKeyNotAccepted')
         elif index == 3:    # linux_prompt_catchall_regexp
-            supposedly_logged_in = True    # We are probably logged in
+            pass    # We are probably logged in
         
-        if supposedly_logged_in: print('Supposedly logged in')
-    
-        if supposedly_logged_in:    # If we think we have been logged in... try to hit return and check if we have a prompt once more
-            self._exp.send('\r')    # Wake up terminal (we send a carriage return to find out if we are logged in (in a shell) or not (in the prompt))
-            index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, self._prompt], timeout=2)
-            if index == 0:    # Timeout
-                logger.error("Could not wake up terminal")
-                exit(5)
-            elif index == 1:    # EOF
-                logger.error("Remote connection closed")
-                exit(5)
-            elif index == 2:    # linux_prompt_catchall_regexp a second time
-                surely_logged_in = True    # We really think we are logged in now
-        if surely_logged_in: print('Surely logged in')
+        # We think we have been logged in... try to hit return and check if we have a prompt once more
+        self._exp.send('\r')    # Wake up terminal (we send a carriage return to find out if we are logged in (in a shell) or not (in the prompt))
+        self.catch_prompt()
+        self.logger.debug('Logged in to tundev shell')
+        # Note: rule for all methods is to always end up with a fresh prompt catched, ready to type new commands
             
 #     def rdv_server_connect(self):
 #         """ Initiate the ssh connection to the RDV server """
@@ -92,6 +91,31 @@ class TunnellingDev(object):
 
     def rdv_server_disconnect(self):
         """ Close the ssh connection to the RDV server if it is up """
-        if not self._ssh_connection is None:
-            self._ssh_connection.close()
-
+        if not self._exp is None:
+            self._exp.send('logout\r')
+            self._exp.close()
+            self._exp =  None
+    
+    def run_command(self, command, prompt_timeout = 2):
+        """ Run a tundev shell command and return the output as a string
+        \param command A string containing the tundev shell command to execute (without the ending carriage return)
+        \param prompt_timeout A int containing a timeout for the new prompt to appear after having typed the command
+        \return The output (mixed stout and stderr) that we got before the new prompt
+        """
+        if not self._exp is None:
+            self._exp.buffer = ''
+            self._exp.before = ''   # Eat all preceeding input
+            self._exp.send(command + '\r')
+            self.catch_prompt(timeout=prompt_timeout)
+            output = str(self._exp.before)
+            # Now, in output, we might have the whole command included (most terminals do echo what is typed in)
+            if output.startswith(command):
+                output = output[len(command):]
+                if output.startswith('\r\n'):   # Get rid of MSDOS-style carriage returns
+                    output = output[2:]
+                elif output.startswith('\n'):   # Get rid of UNIX-style carriage returns
+                    output = output[1:]
+                    
+            #print(' '.join(x.encode('hex') for x in output))
+            #print('Got command result is: "' + output + '"\n\n')
+            return output

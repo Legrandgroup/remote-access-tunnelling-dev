@@ -16,26 +16,13 @@ progname = os.path.basename(sys.argv[0])
 class OnsiteDev(tundev_script.TunnellingDev):
     """ Script to connect to a RDV server from an onsite dev """
 
-    def __init__(self, username, key_filename, logger):
+    def __init__(self, username, logger, key_filename = None):
+        """ Constructor
+        \param username The username to use with ssh to connect to the RDV server
+        \param key_filename A file containing the private key for key-based ssh authentication
+        \param logger A logging.Logger to use for log messages
+        """
         super(OnsiteDev, self).__init__(username=username, key_filename=key_filename, logger=logger)
-
-    def run_cmd(self, command):
-        """ Execute this command on the remote server """
-        if command:
-            if self._ssh_connection:
-                print('Host: %s'  % (self._rdv_server))
-                #stdin, stdout, stderr = self._ssh_connection.exec_command(command)
-                #stdin.close()
-                #print('Dumping output...\n')
-                #for line in stdout.read().splitlines():
-                #    print('host: %s: %s' % (self._rdv_server, line))
-                #print('...Done\n')
-                channel = self._ssh_connection.invoke_shell()
-                channel.send('echo bla\r')
-                result = ''
-                while channel.recv_ready():
-                    result += channel.recv(1024)
-                print('Got output:' + result)
 
     def exit(self):
         """ Terminate the onsite dev script """
@@ -65,7 +52,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     logger.debug(progname + ": Starting")
     print('Starting onsite dev script');
-    onsite_dev = OnsiteDev(username = 'rpi1001', key_filename = '/home/lionel/.ssh/id_rsa', logger = logger)
+    onsite_dev = OnsiteDev(username = 'rpi1001', logger = logger)
     onsite_dev.rdv_server_connect()
-    onsite_dev.run_cmd('echo bla')
+    print('Got :"' + onsite_dev.run_command('echo bla') + '"')
     onsite_dev.exit()
