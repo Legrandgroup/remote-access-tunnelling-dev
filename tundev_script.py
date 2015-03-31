@@ -143,3 +143,23 @@ class TunnellingDev(object):
             #print(' '.join(x.encode('hex') for x in output))
             #print('Got command result is: "' + output + '"\n\n')
             return output
+        else:
+            raise('NotConnected')
+        
+    def _strip_trailing_cr_from(self, string):
+        """ Removes the trailing carriage return from the string provided as argument
+        \param string The input string
+        \return The string with the last carriage returns stripped
+        """
+        if string.endswith('\r\n'):   # Get rid of MSDOS-style carriage returns at the end of the string
+            string = string[:-2]
+        elif string.endswith('\n'):   # Get rid of UNIX-style carriage returns at the end of the string
+            string = string[:-1]
+        return string
+
+    def run_get_tunnel_mode(self):
+        """ Run the command get_tunnel_mode on the remote tundev shell
+        \return The tunnel mode as a string
+        """
+        return self._strip_trailing_cr_from(self.run_command('get_tunnel_mode', 2))
+        
