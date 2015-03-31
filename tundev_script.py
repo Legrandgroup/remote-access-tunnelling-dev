@@ -10,6 +10,8 @@ import sys
 
 import logging
 
+import tempfile
+
 class TunnellingDev(object):
     """ Class representing a tunnelling device
     A tunnelling device is a abstract device gathering client devices or server devices
@@ -30,6 +32,7 @@ class TunnellingDev(object):
         self._exp = None
         self._prompt = '1001[$] '
         self.logger = logger
+        self.exp_logfile = None # This attribute, if not None, will contain a tempfile.TemporaryFile object where all expect session is stored
         
     def catch_prompt(self, timeout = 2):
         """ Wait for a remote prompt to appear
@@ -64,6 +67,9 @@ class TunnellingDev(object):
         index = self._exp.expect([pexpect.TIMEOUT, 'Permission denied', self._ssh_username + '@.*password: ', self._prompt], timeout=4)
         if self.logger.isEnabledFor(logging.DEBUG):
             self._exp.logfile = sys.stdout    # Log to stdout in DEBUG mode
+        else:
+            self.exp_logfile = tempfile.TemporaryFile() # Create a temprary file to store expect session
+            self._exp.logfile = self.exp_logfile
         
         if index == 0:
             self.logger.error("Remote connection closed")
