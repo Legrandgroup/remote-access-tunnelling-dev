@@ -54,5 +54,6 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     print('Starting onsite dev script');
     onsite_dev = OnsiteDev(username = 'rpi1001', logger = logger)
     onsite_dev.rdv_server_connect()
+    print('My IP address is: ' + str(onsite_dev._get_ip('eth0')))
     print('Got :"' + onsite_dev.run_command('echo bla') + '"')
     onsite_dev.exit()

@@ -12,6 +12,9 @@ import logging
 
 import tempfile
 
+import socket, struct, fcntl    # For get_ip()
+
+
 class TunnellingDev(object):
     """ Class representing a tunnelling device
     A tunnelling device is a abstract device gathering client devices or server devices
@@ -33,7 +36,23 @@ class TunnellingDev(object):
         self._prompt = '1001[$] '
         self.logger = logger
         self.exp_logfile = None # This attribute, if not None, will contain a tempfile.TemporaryFile object where all expect session is stored
-        
+    
+    def _get_ip(self, iface = 'eth0'):
+        """ Get the IPv4 address of the specified interface
+        \param iface The interface to check
+        \return A string containing the four-dotted representation of the IP address
+        """
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sockfd = sock.fileno()
+        SIOCGIFADDR = 0x8915
+        ifreq = struct.pack('16sH14s', iface, socket.AF_INET, '\x00'*14)
+        try:
+            res = fcntl.ioctl(sockfd, SIOCGIFADDR, ifreq)
+        except:
+            return None
+        ip = struct.unpack('16sH2x4s8x', res)[2]
+        return socket.inet_ntoa(ip)
+    
     def catch_prompt(self, timeout = 2):
         """ Wait for a remote prompt to appear
         
@@ -50,7 +69,6 @@ class TunnellingDev(object):
             raise('ConnectionError')
         elif index == 2:    # linux_prompt_catchall_regexp a second time
             pass    # We are now sure we are logged in now
-        
     
     def rdv_server_connect(self):
         """ Initiate the ssh connection to the RDV server
