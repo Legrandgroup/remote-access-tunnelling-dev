@@ -59,4 +59,6 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     onsite_dev.send_lan_ip_address_for_iface('eth0')
     onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
     print('Got :"' + onsite_dev.run_command('echo bla') + '"')
+    vtun_params = onsite_dev.get_vtun_parameters()  # Returns a dict
+    print('Got vtun params: "' + str(vtun_params) + '"')
     onsite_dev.exit()

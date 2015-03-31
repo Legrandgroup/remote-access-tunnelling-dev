@@ -193,3 +193,22 @@ class TunnellingDev(object):
         """
         self.run_command('set_tunnelling_dev_uplink_type ' + str(uplink_type), 2)
     
+    def run_get_vtun_parameters(self):
+        """ Run the command get_tunnel_mode on the remote tundev shell
+        \return The vtun config output string returned by the RDV server
+        """
+        return self._strip_trailing_cr_from(self.run_command('get_vtun_parameters', 20))
+    
+    def get_vtun_parameters(self):
+        """ Request the vtun parameters from the RDV server and return them in a dict containing each field as a key together with its value
+        \return A dict synthetising the vtun parameters, for example {'tunnel_ip_network': '192.168.101.0', 'tunnel_ip_prefix': '/30', ...}
+        """
+        vtun_parameters_str = self.run_get_vtun_parameters()
+        dict = {}
+        for line in vtun_parameters_str.splitlines():
+            split = line.split(':', 1)  # Cut in key:value
+            key = split[0].strip()  # Get rid of leading and trailing whitespaces in key
+            value = split[1].strip()  # Get rid of leading and trailing whitespaces in value
+            dict[key]=value
+            print('Key="' + key + '", value="' + value + '"')
+        return dict
