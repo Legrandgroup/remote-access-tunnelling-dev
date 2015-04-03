@@ -16,6 +16,7 @@ import ipaddr
 
 import socket, struct, fcntl    # For get_ip()
 
+from pythonvtunlib import client_vtun_tunnel
 
 class TunnellingDev(object):
     """ Class representing a tunnelling device
@@ -23,7 +24,7 @@ class TunnellingDev(object):
     """
     
     PROTO_RDV_SERVER = '10.10.8.11'
-    
+                
     def __init__(self, username, logger, key_filename = None):
         """ Constructor
         \param username The username to use with ssh to connect to the RDV server
@@ -74,11 +75,11 @@ class TunnellingDev(object):
         """
         index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, self._prompt], timeout=timeout)
         if index == 0:    # Timeout
-            self.logger.error("Could not wake up terminal")
-            raise('ConnectionError')
+            self.logger.error("Remote connection is frozen")
+            raise Exception('SSHConnectionLost')
         elif index == 1:    # EOF
             self.logger.error("Remote connection closed")
-            raise('ConnectionError')
+            raise Exception('SSHConnectionLost')
         elif index == 2:    # linux_prompt_catchall_regexp a second time
             pass    # We are now sure we are logged in now
     
@@ -94,23 +95,30 @@ class TunnellingDev(object):
         supposedly_logged_in = False
         surely_logged_in = False
         
-        index = self._exp.expect([pexpect.TIMEOUT, 'Permission denied', self._ssh_username + '@.*password: ', self._prompt], timeout=4)
+        index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, 'Permission denied', self._ssh_username + '@.*password: ', self._prompt], timeout=4)
         if self.logger.isEnabledFor(logging.DEBUG):
             self._exp.logfile = sys.stdout    # Log to stdout in DEBUG mode
         else:
             self.exp_logfile = tempfile.TemporaryFile() # Create a temprary file to store expect session
             self._exp.logfile = self.exp_logfile
         
-        if index == 0:
+        if index == 0 or index == 1:
             self.logger.error("Remote connection closed")
-            raise('ConnectionError')
-        elif index == 1:
+            session_output = str(self._exp.before) + str(self._exp.buffer)
+            session_output = '|' + session_output.replace('\n', '\n|')  # Prefix the whole output with a | character so that dump is easily spotted
+            if session_output.endswith('|'):    # Remove the last line that only contains a | character
+                session_output = session_output[:-1]
+            while session_output.endswith('|\n'):   # Get rid of the last empty line(s) that is/are present most of the time
+                session_output = session_output[:-2]
+            print('Failed to open remote ssh connection. Output was:\n' + session_output , file=sys.stderr)
+            raise Exception('ConnectionError')
+        elif index == 2:
             self.logger.error("Permission denied, public key authentication rejected")
             raise Exception('PublicKeyNotAccepted')
-        elif index == 2:
+        elif index == 3:
             self.logger.error("Username/password required, public key authentication rejected")
             raise Exception('PublicKeyNotAccepted')
-        elif index == 3:    # linux_prompt_catchall_regexp
+        elif index == 4:    # linux_prompt_catchall_regexp
             pass    # We are probably logged in
         
         # We think we have been logged in... try to hit return and check if we have a prompt once more
@@ -199,16 +207,69 @@ class TunnellingDev(object):
         """
         return self._strip_trailing_cr_from(self.run_command('get_vtun_parameters', 20))
     
-    def get_vtun_parameters(self):
+    class ClientVtunTunnelConfig(object):
+        """ Class representing a tunnelling device configuration as provided by the remote tundev shell command get_vtun_parameters
+        This class is just a container around a python dict, with one method allowing to generate a pythonvtunlib.client_vtun_tunnel based on the parameters contained in the self.dict attribute  
+        """
+        def __init__(self, config_dict, tunnel_mode, tunnel_name):
+            """ Constructor
+            \param dict A python dict to encapsulate into this object
+            \param tunnel_mode The tunnel mode ('L2', 'L3' etc...)
+            \param tunnel_name Name (in the vtund terminology) of the tunnel session
+            """
+            self.config_dict = config_dict
+            self.tunnel_mode = tunnel_mode
+            self.tunnel_name = tunnel_name
+        
+        def to_client_vtun_tunnel_object(self):
+            """ Create a pythonvtunlib.client_vtun_tunnel object based on the configuration found in our self.dict attribute
+        
+            If the self.dict attribute does not have (enough) information to build a client tunnel, an exception will be raised
+            \return The resulting pythonvtunlib.client_vtun_tunnel
+            """
+            try:
+                tunnel_ip_prefix = str(self.config_dict['tunnel_ip_prefix'])
+                tunnel_ip_network = str(self.config_dict['tunnel_ip_network'])
+                if not tunnel_ip_prefix.startswith('/'):
+                    tunnel_ip_network += '/'
+                tunnel_ip_network += tunnel_ip_prefix
+    
+                return client_vtun_tunnel.ClientVtunTunnel(tunnel_ip_network=tunnel_ip_network,
+                                                           tunnel_near_end_ip=str(self.config_dict['tunnelling_dev_ip_address']),
+                                                           tunnel_far_end_ip=str(self.config_dict['rdv_server_ip_address']),
+                                                           vtun_server_tcp_port=str(self.config_dict['rdv_server_vtun_tcp_port']),
+                                                           vtun_shared_secret=str(self.config_dict['tunnel_secret']),
+                                                           vtun_tunnel_name=self.tunnel_name,
+                                                           mode=self.tunnel_mode
+                                                           )
+            except KeyError:
+                raise Exception('IncompleteTunnelParameters')
+
+    def _get_vtun_parameters_as_dict(self):
         """ Request the vtun parameters from the RDV server and return them in a dict containing each field as a key together with its value
         \return A dict synthetising the vtun parameters, for example {'tunnel_ip_network': '192.168.101.0', 'tunnel_ip_prefix': '/30', ...}
         """
         vtun_parameters_str = self.run_get_vtun_parameters()
-        dict = {}
+        config_dict = {}
         for line in vtun_parameters_str.splitlines():
             split = line.split(':', 1)  # Cut in key:value
             key = split[0].strip()  # Get rid of leading and trailing whitespaces in key
             value = split[1].strip()  # Get rid of leading and trailing whitespaces in value
-            dict[key]=value
-            print('Key="' + key + '", value="' + value + '"')
-        return dict
+            config_dict[key]=value
+        return config_dict
+    
+    def get_client_vtun_tunnel(self, tunnel_mode):
+        """ Create a pythonvtunlib.client_vtun_tunnel object based on the configuration returned by the devshell command get_vtun_parameters
+        
+        If the vtun_parameters_dict provided by the internal call to self._get_vtun_parameters_as_dict() does not have (enough) information to build a client tunnel, an exception will be raised
+        \param tunnel_mode The tunnel mode ('L2', 'L3' etc...) 
+        \return The resulting pythonvtunlib.client_vtun_tunnel
+        """
+        tunnel_name = 'tundev' + str(self._ssh_username)
+        return TunnellingDev.ClientVtunTunnelConfig(config_dict = self._get_vtun_parameters_as_dict(),
+                                                    tunnel_mode=tunnel_mode,
+                                                    tunnel_name=tunnel_name).to_client_vtun_tunnel_object()
+    
+    def dict_to_client_vtun_tunnel_object(self, vtun_parameters_dict, tunnel_mode):
+        tunnel_name = 'tundev' + str(self._ssh_username)
+        return TunnellingDev.ClientVtunTunnelConfig(config_dict = vtun_parameters_dict, tunnel_mode=tunnel_mode, tunnel_name=tunnel_name).to_client_vtun_tunnel_object()

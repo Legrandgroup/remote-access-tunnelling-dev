@@ -27,6 +27,8 @@ class OnsiteDev(tundev_script.TunnellingDev):
     def exit(self):
         """ Terminate the onsite dev script """
         self.rdv_server_disconnect()
+        if self.logger.isEnabledFor(logging.DEBUG):
+            print('')   # Add a carriage return after logout to allow showing the last line before we return to the caller
 
 if __name__ == '__main__':
     # Parse arguments
@@ -51,7 +53,6 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.propagate = False
     
     logger.debug(progname + ": Starting")
-    print('Starting onsite dev script');
     onsite_dev = OnsiteDev(username = 'rpi1001', logger = logger)
     onsite_dev.rdv_server_connect()
     tunnel_mode = onsite_dev.run_get_tunnel_mode()
@@ -59,6 +60,5 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     onsite_dev.send_lan_ip_address_for_iface('eth0')
     onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
     print('Got :"' + onsite_dev.run_command('echo bla') + '"')
-    vtun_params = onsite_dev.get_vtun_parameters()  # Returns a dict
-    print('Got vtun params: "' + str(vtun_params) + '"')
+    vtun_client = onsite_dev.get_client_vtun_tunnel(tunnel_mode)  # Returns a pythonvtunlib.client_vtun_tunnel object
     onsite_dev.exit()
