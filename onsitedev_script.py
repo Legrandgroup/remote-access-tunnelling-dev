@@ -60,5 +60,6 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     onsite_dev.send_lan_ip_address_for_iface('eth0')
     onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
     print('Got :"' + onsite_dev.run_command('echo bla') + '"')
-    vtun_client = onsite_dev.get_client_vtun_tunnel(tunnel_mode)  # Returns a pythonvtunlib.client_vtun_tunnel object
+    vtun_client = onsite_dev.get_client_vtun_tunnel(tunnel_mode, vtund_exec = '/usr/sbin/vtund')  # Returns a pythonvtunlib.client_vtun_tunnel object
+    vtun_client.start()
     onsite_dev.exit()
