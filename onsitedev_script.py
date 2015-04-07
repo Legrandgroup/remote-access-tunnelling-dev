@@ -73,6 +73,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     print('Now sleeping 30s')
     time.sleep(30)
     print('Slept 30s')
+    vtun_client.stop()
     session_output = vtun_client.get_output()
     session_output = '|' + session_output.replace('\n', '\n|')  # Prefix the whole output with a | character so that dump is easily spotted
     if session_output.endswith('|'):    # Remove the last line that only contains a | character
