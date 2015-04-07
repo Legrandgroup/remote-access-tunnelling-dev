@@ -26,22 +26,27 @@ class TunnellingDev(object):
     PROTO_RDV_SERVER = '10.10.8.11'
     SSH_ESCAPE_SHELL_PROMPT = 'ssh> '
                 
-    def __init__(self, username, logger, key_filename = None):
+    def __init__(self, username, logger, key_filename = None, prompt = None):
         """ Constructor
         \param username The username to use with ssh to connect to the RDV server
-        \param key_filename A file containing the private key for key-based ssh authentication
         \param logger A logging.Logger to use for log messages
+        \param key_filename A file containing the private key for key-based ssh authentication
+        \param prompt The expected prompt (if None, will be built from the username) 
         """
         self._rdv_server = TunnellingDev.PROTO_RDV_SERVER
         #self._ssh_connection = None
         self._ssh_username = username
         self._ssh_key_filename = key_filename
         self._exp = None
-        self._prompt = '1001[$] '
+        if prompt is None:
+            self._prompt = username + '[$] '
+        else:
+            self._prompt = str(prompt)
+        
         self.logger = logger
         self.exp_logfile = None # This attribute, if not None, will contain a tempfile.TemporaryFile object where all expect session is stored
         self.ssh_escape_shell_supported = None  # This attribute will be set to True if an escape ssh shell is supported on our ssh client
-        self.ssh_r_supported = None # This attributes describes whether remote port forwarding is supported on the ssh session (ssh -R option)
+        self.ssh_l_supported = None # This attributes describes whether remote port forwarding is supported on the ssh session (ssh -L option)
         self.ssh_remote_tcp_port = None # This attribute contains the remote TCP port on which vtun is accessible on the remote machine (we will tunnel this into the existing ssh session) 
     
     def _get_ip_network(self, iface = 'eth0'):
@@ -202,22 +207,22 @@ class TunnellingDev(object):
                     self.logger.debug('Successfully entered an ssh escape shell')
                     self.ssh_escape_shell_supported = True
                     self._exp.send('help\r')
-                    index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, '-R\[.*:\].*:.*:.*'], timeout=1)
+                    index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, '-L\[.*:\].*:.*:.*'], timeout=1)
                     if index == 0:    # Timeout
                         self.logger.warning('No remote port forwarding supported in this ssh session')
-                        self.ssh_r_supported = False
+                        self.ssh_l_supported = False
                     elif index == 1:    # EOF
                         self.logger.error('Remote connection closed')
                         raise Exception('SSHConnectionLost')
-                    elif index == 2:    # Got the -R option
+                    elif index == 2:    # Got the -L option
                         self.logger.debug('Remote port forwarding is supported in this ssh session')
-                        self.ssh_r_supported = True
+                        self.ssh_l_supported = True
                     self.run_command('echo ...done')
             else:
                 raise('NotConnected')
             
     def ssh_port_forward(self, local_port, remote_port, hostname_target_on_remote = '127.0.0.1', bind_address = None):
-        """ Sets a remote port forwarding on the current ssh session (equivalent to the ssh -R option, with the same arguments)
+        """ Sets a remote port forwarding on the current ssh session (equivalent to the ssh -L option, with the same arguments)
         
         If we are unable to perform the forward, we will raise an exception
         \param local_port The TCP port on the local machine that will be forwarded to the remote ssh host inside the ssh session
@@ -226,14 +231,14 @@ class TunnellingDev(object):
         \param bind_address The IP address on which to bind the listening (TCP) socket on the local machine (this is the socket that will listen on the \p local_port)
         """
         self._assert_ssh_escape_shell() # Make sure we check the escape shell and its capabilities
-        if not self.ssh_r_supported:
+        if not self.ssh_l_supported:
             raise Exception('NoRemoteSSHForwardingSupported')
         if local_port is None:
             raise Exception('LocalPortIsMandatory')
         if remote_port is None:
             raise Exception('RemotePortIsMandatory')
-        # ssh remote redirect command is -R[bind_address:]port:host:hostport
-        ssh_redirect_command = '-R'
+        # ssh remote redirect command is -L[bind_address:]port:host:hostport
+        ssh_redirect_command = '-L'
         if not bind_address is None:
             ssh_redirect_command += str(bind_address) + ':'
         
@@ -248,6 +253,7 @@ class TunnellingDev(object):
         self._exp.send('~C')
         index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, TunnellingDev.SSH_ESCAPE_SHELL_PROMPT], timeout=2)
         if index == 0:    # Timeout
+            self.ssh_escape_shell_supported = False # Remember that ssh escape shell failed this time
             raise Exception('NoSSHEscapeShellAvailable')
         elif index == 1:    # EOF
             self.logger.error('Remote connection closed')
@@ -343,6 +349,7 @@ class TunnellingDev(object):
         vtun_parameters_str = self.run_get_vtun_parameters()
         config_dict = {}
         for line in vtun_parameters_str.splitlines():
+            print('Line: "' + line + '"')
             split = line.split(':', 1)  # Cut in key:value
             key = split[0].strip()  # Get rid of leading and trailing whitespaces in key
             value = split[1].strip()  # Get rid of leading and trailing whitespaces in value
