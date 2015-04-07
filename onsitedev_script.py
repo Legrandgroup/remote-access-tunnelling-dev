@@ -66,11 +66,20 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     vtun_client = onsite_dev.get_client_vtun_tunnel(tunnel_mode,
                                                     vtun_server_hostname='127.0.0.1',
                                                     vtun_server_port=locally_redirected_vtun_server_port,
-                                                    vtund_exec='/usr/sbin/vtund')  # Returns a pythonvtunlib.client_vtun_tunnel object
+                                                    vtund_exec='/usr/sbin/vtund',
+                                                    vtund_use_sudo=True)  # Returns a pythonvtunlib.client_vtun_tunnel object
     onsite_dev._assert_ssh_escape_shell()
     onsite_dev.ssh_port_forward(locally_redirected_vtun_server_port,
                                 onsite_dev.ssh_remote_tcp_port)
     vtun_client.start()
-    print('Now sleeping 2min')
-    time.sleep(120)
+    print('Started vtun client as PID ' + str(vtun_client._vtun_pid))
+    print('Now sleeping 30s')
+    time.sleep(30)
+    session_output = vtun_client.get_output()
+    session_output = '|' + session_output.replace('\n', '\n|')  # Prefix the whole output with a | character so that dump is easily spotted
+    if session_output.endswith('|'):    # Remove the last line that only contains a | character
+        session_output = session_output[:-1]
+    while session_output.endswith('|\n'):   # Get rid of the last empty line(s) that is/are present most of the time
+        session_output = session_output[:-2]
+    print('vtun command output was:\n' + session_output , file=sys.stderr)
     onsite_dev.exit()

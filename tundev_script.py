@@ -297,14 +297,15 @@ class TunnellingDev(object):
         """ Class representing a tunnelling device configuration as provided by the remote tundev shell command get_vtun_parameters
         This class is just a container around a python dict, with one method allowing to generate a pythonvtunlib.client_vtun_tunnel based on the parameters contained in the self.dict attribute  
         """
-        def __init__(self, config_dict, tunnel_mode, tunnel_name, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtun_connection_timeout = 20):
+        def __init__(self, config_dict, tunnel_mode, tunnel_name, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtund_use_sudo = False, vtun_connection_timeout = 20):
             """ Constructor
             \param dict A python dict to encapsulate into this object
             \param tunnel_mode The tunnel mode ('L2', 'L3' etc...)
             \param tunnel_name Name (in the vtund terminology) of the tunnel session
             \param vtun_server_hostname The hostname to connect to (the vtund server)
             \param vtun_server_port The TCP port to use when connecting to the vtund server  
-            \param vtund_exec The PATH to the vtund binary
+            \param vtund_exec (optional) The PATH to the vtund binary
+            \param vtund_use_sudo (optional) A boolean indicating whether the vtund_exec needs to be run via sudo to get root access (False by default)
             \param vtun_connection_timeout How many seconds we give for the tunnel establishment (20 by default)
             """
             self.config_dict = config_dict
@@ -313,6 +314,7 @@ class TunnellingDev(object):
             self.vtun_server_hostname = vtun_server_hostname
             self.vtun_server_port = vtun_server_port
             self.vtund_exec = vtund_exec
+            self.vtund_use_sudo = vtund_use_sudo
             self.vtun_connection_timeout = vtun_connection_timeout
         
         def to_client_vtun_tunnel_object(self):
@@ -329,6 +331,7 @@ class TunnellingDev(object):
                 tunnel_ip_network += tunnel_ip_prefix
     
                 return client_vtun_tunnel.ClientVtunTunnel(vtund_exec = self.vtund_exec,
+                                                           vtund_use_sudo = self.vtund_use_sudo,
                                                            tunnel_ip_network=tunnel_ip_network,
                                                            tunnel_near_end_ip=str(self.config_dict['tunnelling_dev_ip_address']),
                                                            tunnel_far_end_ip=str(self.config_dict['rdv_server_ip_address']),
@@ -349,21 +352,21 @@ class TunnellingDev(object):
         vtun_parameters_str = self.run_get_vtun_parameters()
         config_dict = {}
         for line in vtun_parameters_str.splitlines():
-            print('Line: "' + line + '"')
             split = line.split(':', 1)  # Cut in key:value
             key = split[0].strip()  # Get rid of leading and trailing whitespaces in key
             value = split[1].strip()  # Get rid of leading and trailing whitespaces in value
             config_dict[key]=value
         return config_dict
     
-    def get_client_vtun_tunnel(self, tunnel_mode, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtun_connection_timeout = 20):
+    def get_client_vtun_tunnel(self, tunnel_mode, vtun_server_hostname, vtun_server_port, vtund_exec = None,  vtund_use_sudo = False, vtun_connection_timeout = 20):
         """ Create a pythonvtunlib.client_vtun_tunnel object based on the configuration returned by the devshell command get_vtun_parameters
         
         If the vtun_parameters_dict provided by the internal call to self._get_vtun_parameters_as_dict() does not have (enough) information to build a client tunnel, an exception will be raised
         \param tunnel_mode The tunnel mode ('L2', 'L3' etc...)
         \param vtun_server_hostname The hostname to connect to (the vtund server)
         \param vtun_server_port The TCP port to use when connecting to the vtund server  
-        \param vtund_exec The PATH to the vtund binary
+        \param vtund_exec (optional) The PATH to the vtund binary
+        \param vtund_use_sudo (optional) A boolean indicating whether the vtund_exec needs to be run via sudo to get root access (False by default)
         \param vtun_connection_timeout How many seconds we give for the tunnel establishment (20 by default)
         \return The resulting pythonvtunlib.client_vtun_tunnel
         """
