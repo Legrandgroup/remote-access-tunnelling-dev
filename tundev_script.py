@@ -24,6 +24,7 @@ class TunnellingDev(object):
     """
     
     PROTO_RDV_SERVER = '10.10.8.11'
+    SSH_ESCAPE_SHELL_PROMPT = 'ssh> '
                 
     def __init__(self, username, logger, key_filename = None):
         """ Constructor
@@ -39,6 +40,9 @@ class TunnellingDev(object):
         self._prompt = '1001[$] '
         self.logger = logger
         self.exp_logfile = None # This attribute, if not None, will contain a tempfile.TemporaryFile object where all expect session is stored
+        self.ssh_escape_shell_supported = None  # This attribute will be set to True if an escape ssh shell is supported on our ssh client
+        self.ssh_r_supported = None # This attributes describes whether remote port forwarding is supported on the ssh session (ssh -R option)
+        self.ssh_remote_tcp_port = None # This attribute contains the remote TCP port on which vtun is accessible on the remote machine (we will tunnel this into the existing ssh session) 
     
     def _get_ip_network(self, iface = 'eth0'):
         """ Get the IPv4 address of the specified interface
@@ -177,6 +181,59 @@ class TunnellingDev(object):
             string = string[:-1]
         return string
     
+    def _assert_ssh_escape_shell(self):
+        """ Check if an ssh escape shell is available in the current ssh session
+        
+        Note: this check will only be performed once, and its result will then be cached and re-used for future calls to this method
+        If this check fails, an exception will be raised, otherwise, self.ssh_escape_shell_supported will be set to True
+        """
+        if not self.ssh_escape_shell_supported:
+            if not self._exp is None:
+                self.run_command('echo Testing ssh escape shell')
+                self._exp.send('~C')
+                index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, TunnellingDev.SSH_ESCAPE_SHELL_PROMPT], timeout=2)
+                if index == 0:    # Timeout
+                    self.logger.error('Failed to get an ssh escape shell')
+                    raise Exception('NoSSHEscapeShellAvailable')
+                elif index == 1:    # EOF
+                    self.logger.error('Remote connection closed')
+                    raise Exception('SSHConnectionLost')
+                elif index == 2:    # Got the ssh> escape shell prompt
+                    self.logger.debug('Successfully entered an ssh escape shell')
+                    self.ssh_escape_shell_supported = True
+                    self._exp.send('help\r')
+                    index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, '-R\[.*:\].*:.*:.*'], timeout=1)
+                    if index == 0:    # Timeout
+                        self.logger.warning('No remote port forwarding supported in this ssh session')
+                        self.ssh_r_supported = False
+                    elif index == 1:    # EOF
+                        self.logger.error('Remote connection closed')
+                        raise Exception('SSHConnectionLost')
+                    elif index == 2:    # Got the -R option
+                        self.logger.debug('Remote port forwarding is supported in this ssh session')
+                        self.ssh_r_supported = True
+                    self.run_command('echo ...done')
+            else:
+                raise('NotConnected')
+            
+    def ssh_port_forward(self, local_port, remote_port, hostname_target_on_remote = '127.0.0.1', bind_address = None):
+        """ Sets a remote port forwarding on the current ssh session (equivalent to the ssh -R option, with the same arguments)
+        
+        If we are unable to perform the forward, we will raise an exception
+        \param local_port The TCP port on the local machine that will be forwarded to the remote ssh host inside the ssh session
+        \param remote_port The TCP port on the remote machine to which will be output the forwarded traffic
+        \param hostname_target_on_remote An optional remote machine to which will be output the forwarded traffic (optional, by default this is the remote machine itself)
+        \param bind_address The IP address on which to bind the listening (TCP) socket on the local machine (this is the socket that will listen on the \p local_port)
+        """
+        self._assert_ssh_escape_shell() # Make sure we check the escape shell and its capabilities
+        if not self.ssh_r_supported:
+            raise Exception('NoRemoteSSHForwardingSupported')
+        if local_port is None:
+            raise Exception('LocalPortIsMandatory')
+        if remote_port is None:
+            raise Exception('RemotePortIsMandatory')
+        print('Fake redirect local ' + str(local_port) + ' to remote ' + str(remote_port))
+    
     def run_set_tunnelling_dev_lan_ip_address(self, ip):
         """ Run the command set_tunnelling_dev_lan_ip_address on the remote tundev shell
         \param ip an ipaddr.IPv4Network object or a string containing the IP address and prefix using the CIDR notation, to communicate to the RDV server
@@ -211,17 +268,19 @@ class TunnellingDev(object):
         """ Class representing a tunnelling device configuration as provided by the remote tundev shell command get_vtun_parameters
         This class is just a container around a python dict, with one method allowing to generate a pythonvtunlib.client_vtun_tunnel based on the parameters contained in the self.dict attribute  
         """
-        def __init__(self, config_dict, tunnel_mode, tunnel_name, vtund_exec = None):
+        def __init__(self, config_dict, tunnel_mode, tunnel_name, vtund_exec = None, vtun_connection_timeout = 20):
             """ Constructor
             \param dict A python dict to encapsulate into this object
             \param tunnel_mode The tunnel mode ('L2', 'L3' etc...)
             \param tunnel_name Name (in the vtund terminology) of the tunnel session
             \param vtund_exec The PATH to the vtund binary
+            \param vtun_connection_timeout How many seconds we give for the tunnel establishment (20 by default)
             """
             self.config_dict = config_dict
             self.tunnel_mode = tunnel_mode
             self.tunnel_name = tunnel_name
             self.vtund_exec = vtund_exec
+            self.vtun_connection_timeout = vtun_connection_timeout
         
         def to_client_vtun_tunnel_object(self):
             """ Create a pythonvtunlib.client_vtun_tunnel object based on the configuration found in our self.dict attribute
@@ -243,7 +302,9 @@ class TunnellingDev(object):
                                                            vtun_server_tcp_port=str(self.config_dict['rdv_server_vtun_tcp_port']),
                                                            vtun_shared_secret=str(self.config_dict['tunnel_secret']),
                                                            vtun_tunnel_name=self.tunnel_name,
-                                                           mode=self.tunnel_mode
+                                                           vtun_server_hostname=str(self.config_dict['rdv_server_ip_address']),
+                                                           mode=self.tunnel_mode,
+                                                           vtun_connection_timeout=self.vtun_connection_timeout
                                                            )
             except KeyError:
                 raise Exception('IncompleteTunnelParameters')
@@ -261,16 +322,24 @@ class TunnellingDev(object):
             config_dict[key]=value
         return config_dict
     
-    def get_client_vtun_tunnel(self, tunnel_mode, vtund_exec = None):
+    def get_client_vtun_tunnel(self, tunnel_mode, vtund_exec = None, vtun_connection_timeout = 20):
         """ Create a pythonvtunlib.client_vtun_tunnel object based on the configuration returned by the devshell command get_vtun_parameters
         
         If the vtun_parameters_dict provided by the internal call to self._get_vtun_parameters_as_dict() does not have (enough) information to build a client tunnel, an exception will be raised
         \param tunnel_mode The tunnel mode ('L2', 'L3' etc...)
         \param vtund_exec The PATH to the vtund binary
+        \param vtun_connection_timeout How many seconds we give for the tunnel establishment (20 by default)
         \return The resulting pythonvtunlib.client_vtun_tunnel
         """
         tunnel_name = 'tundev' + str(self._ssh_username)
-        return TunnellingDev.ClientVtunTunnelConfig(config_dict = self._get_vtun_parameters_as_dict(),
+        config_dict = self._get_vtun_parameters_as_dict()
+        try:
+            self.ssh_remote_tcp_port = config_dict['rdv_server_vtun_tcp_port']
+        except KeyError:
+            raise Exception('RDVServerVtunTCPPortIsMandatory')
+        
+        return TunnellingDev.ClientVtunTunnelConfig(config_dict = config_dict,
                                                     tunnel_mode=tunnel_mode,
                                                     tunnel_name=tunnel_name,
-                                                    vtund_exec = vtund_exec).to_client_vtun_tunnel_object()
+                                                    vtund_exec = vtund_exec,
+                                                    vtun_connection_timeout = vtun_connection_timeout).to_client_vtun_tunnel_object()

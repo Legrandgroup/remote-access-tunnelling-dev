@@ -11,6 +11,8 @@ import tundev_script
 import argparse
 import logging
 
+import time
+
 progname = os.path.basename(sys.argv[0])
 
 class OnsiteDev(tundev_script.TunnellingDev):
@@ -61,5 +63,9 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
     print('Got :"' + onsite_dev.run_command('echo bla') + '"')
     vtun_client = onsite_dev.get_client_vtun_tunnel(tunnel_mode, vtund_exec = '/usr/sbin/vtund')  # Returns a pythonvtunlib.client_vtun_tunnel object
+    onsite_dev._assert_ssh_escape_shell()
+    onsite_dev.ssh_port_forward('5000', onsite_dev.ssh_remote_tcp_port)
     vtun_client.start()
+    print('Now sleeping')
+    time.sleep(30)
     onsite_dev.exit()
