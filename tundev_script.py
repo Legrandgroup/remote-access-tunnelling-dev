@@ -232,7 +232,30 @@ class TunnellingDev(object):
             raise Exception('LocalPortIsMandatory')
         if remote_port is None:
             raise Exception('RemotePortIsMandatory')
-        print('Fake redirect local ' + str(local_port) + ' to remote ' + str(remote_port))
+        # ssh remote redirect command is -R[bind_address:]port:host:hostport
+        ssh_redirect_command = '-R'
+        if not bind_address is None:
+            ssh_redirect_command += str(bind_address) + ':'
+        
+        ssh_redirect_command += str(local_port)
+        ssh_redirect_command += ':'
+        ssh_redirect_command += str(hostname_target_on_remote)
+        ssh_redirect_command += ':'
+        ssh_redirect_command += str(remote_port)
+        
+        self.logger.debug('Adding ssh redirect escape shell "' + ssh_redirect_command + '"')
+        self.run_command('echo Adding ssh redirect escape shell "' + ssh_redirect_command + '"')
+        self._exp.send('~C')
+        index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, TunnellingDev.SSH_ESCAPE_SHELL_PROMPT], timeout=2)
+        if index == 0:    # Timeout
+            raise Exception('NoSSHEscapeShellAvailable')
+        elif index == 1:    # EOF
+            self.logger.error('Remote connection closed')
+            raise Exception('SSHConnectionLost')
+        elif index == 2:    # Got the ssh> escape shell prompt
+            self.logger.debug('Entered in ssh escape shell CLI')
+            self._exp.send(ssh_redirect_command + '\r') # Ask ssh port redirection to the remote session
+        self.run_command('echo ...done')    # Run a dummy command to make sure we got back to ssh shell
     
     def run_set_tunnelling_dev_lan_ip_address(self, ip):
         """ Run the command set_tunnelling_dev_lan_ip_address on the remote tundev shell
@@ -268,17 +291,21 @@ class TunnellingDev(object):
         """ Class representing a tunnelling device configuration as provided by the remote tundev shell command get_vtun_parameters
         This class is just a container around a python dict, with one method allowing to generate a pythonvtunlib.client_vtun_tunnel based on the parameters contained in the self.dict attribute  
         """
-        def __init__(self, config_dict, tunnel_mode, tunnel_name, vtund_exec = None, vtun_connection_timeout = 20):
+        def __init__(self, config_dict, tunnel_mode, tunnel_name, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtun_connection_timeout = 20):
             """ Constructor
             \param dict A python dict to encapsulate into this object
             \param tunnel_mode The tunnel mode ('L2', 'L3' etc...)
             \param tunnel_name Name (in the vtund terminology) of the tunnel session
+            \param vtun_server_hostname The hostname to connect to (the vtund server)
+            \param vtun_server_port The TCP port to use when connecting to the vtund server  
             \param vtund_exec The PATH to the vtund binary
             \param vtun_connection_timeout How many seconds we give for the tunnel establishment (20 by default)
             """
             self.config_dict = config_dict
             self.tunnel_mode = tunnel_mode
             self.tunnel_name = tunnel_name
+            self.vtun_server_hostname = vtun_server_hostname
+            self.vtun_server_port = vtun_server_port
             self.vtund_exec = vtund_exec
             self.vtun_connection_timeout = vtun_connection_timeout
         
@@ -299,10 +326,10 @@ class TunnellingDev(object):
                                                            tunnel_ip_network=tunnel_ip_network,
                                                            tunnel_near_end_ip=str(self.config_dict['tunnelling_dev_ip_address']),
                                                            tunnel_far_end_ip=str(self.config_dict['rdv_server_ip_address']),
-                                                           vtun_server_tcp_port=str(self.config_dict['rdv_server_vtun_tcp_port']),
+                                                           vtun_server_tcp_port=str(self.vtun_server_port),
                                                            vtun_shared_secret=str(self.config_dict['tunnel_secret']),
-                                                           vtun_tunnel_name=self.tunnel_name,
-                                                           vtun_server_hostname=str(self.config_dict['rdv_server_ip_address']),
+                                                           vtun_tunnel_name=str(self.tunnel_name),
+                                                           vtun_server_hostname=str(self.vtun_server_hostname),
                                                            mode=self.tunnel_mode,
                                                            vtun_connection_timeout=self.vtun_connection_timeout
                                                            )
@@ -322,11 +349,13 @@ class TunnellingDev(object):
             config_dict[key]=value
         return config_dict
     
-    def get_client_vtun_tunnel(self, tunnel_mode, vtund_exec = None, vtun_connection_timeout = 20):
+    def get_client_vtun_tunnel(self, tunnel_mode, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtun_connection_timeout = 20):
         """ Create a pythonvtunlib.client_vtun_tunnel object based on the configuration returned by the devshell command get_vtun_parameters
         
         If the vtun_parameters_dict provided by the internal call to self._get_vtun_parameters_as_dict() does not have (enough) information to build a client tunnel, an exception will be raised
         \param tunnel_mode The tunnel mode ('L2', 'L3' etc...)
+        \param vtun_server_hostname The hostname to connect to (the vtund server)
+        \param vtun_server_port The TCP port to use when connecting to the vtund server  
         \param vtund_exec The PATH to the vtund binary
         \param vtun_connection_timeout How many seconds we give for the tunnel establishment (20 by default)
         \return The resulting pythonvtunlib.client_vtun_tunnel
@@ -341,5 +370,7 @@ class TunnellingDev(object):
         return TunnellingDev.ClientVtunTunnelConfig(config_dict = config_dict,
                                                     tunnel_mode=tunnel_mode,
                                                     tunnel_name=tunnel_name,
+                                                    vtun_server_hostname=vtun_server_hostname,
+                                                    vtun_server_port=vtun_server_port,
                                                     vtund_exec = vtund_exec,
                                                     vtun_connection_timeout = vtun_connection_timeout).to_client_vtun_tunnel_object()
