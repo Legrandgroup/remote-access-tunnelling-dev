@@ -125,10 +125,10 @@ class TunnellingDev(object):
             print('Failed to open remote ssh connection. Output was:\n' + session_output , file=sys.stderr)
             raise Exception('ConnectionError')
         elif index == 2:
-            self.logger.error("Permission denied, public key authentication rejected")
+            self.logger.error('Permission denied, public key authentication rejected on account ' + self._ssh_username)
             raise Exception('PublicKeyNotAccepted')
         elif index == 3:
-            self.logger.error("Username/password required, public key authentication rejected")
+            self.logger.error('Username/password required, public key authentication rejected on account ' + self._ssh_username)
             raise Exception('PublicKeyNotAccepted')
         elif index == 4:    # linux_prompt_catchall_regexp
             pass    # We are probably logged in
