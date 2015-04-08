@@ -60,19 +60,27 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
     print('Got: "' + onsite_dev.run_command('echo bla') + '"')
     locally_redirected_vtun_server_port = 5000
-    vtun_client = onsite_dev.get_client_vtun_tunnel(tunnel_mode,
-                                                    vtun_server_hostname='127.0.0.1',
-                                                    vtun_server_port=locally_redirected_vtun_server_port,
-                                                    vtund_exec='/usr/sbin/vtund',
-                                                    vtund_use_sudo=True)  # Returns a pythonvtunlib.client_vtun_tunnel object
+    vtun_client_config = onsite_dev.get_client_vtun_tunnel(tunnel_mode,
+                                                           vtun_server_hostname='127.0.0.1',
+                                                           vtun_server_port=locally_redirected_vtun_server_port,
+                                                           vtund_exec='/usr/sbin/vtund',
+                                                           vtund_use_sudo=True)  # Returns a pythonvtunlib.client_vtun_tunnel object
+    vtun_client = vtun_client_config.to_client_vtun_tunnel_object()
     onsite_dev._assert_ssh_escape_shell()
+    logger.debug('Adding ssh port redirection to ssh session')
     onsite_dev.ssh_port_forward(locally_redirected_vtun_server_port,
                                 onsite_dev.ssh_remote_tcp_port)
     vtun_client.start()
-    print('Started vtun client as PID ' + str(vtun_client._vtun_pid))
-    print('Now sleeping 30s')
-    time.sleep(30)
-    print('Slept 30s')
+    logger.debug('Started local vtun client as PID ' + str(vtun_client._vtun_pid))
+    try:
+        vtun_client_config.check_ping_peer()
+    except:
+        logger.error('Peer does not respond to pings inside the tunnel')
+        raise Exception('TunnelNotWorking')
+    logger.debug('Tunnel to RDV server is up (got a ping reply)')
+    print('Now sleeping 15s')
+    time.sleep(15)
+    print('...done')
     vtun_client.stop()
     session_output = vtun_client.get_output()
     session_output = '|' + session_output.replace('\n', '\n|')  # Prefix the whole output with a | character so that dump is easily spotted

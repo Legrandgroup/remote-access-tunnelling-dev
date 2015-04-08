@@ -16,6 +16,9 @@ import ipaddr
 
 import socket, struct, fcntl    # For get_ip()
 
+import os
+import subprocess
+
 from pythonvtunlib import client_vtun_tunnel
 
 class TunnellingDev(object):
@@ -344,6 +347,26 @@ class TunnellingDev(object):
                                                            )
             except KeyError:
                 raise Exception('IncompleteTunnelParameters')
+            
+        def check_ping_peer(self):
+            """ Check that the tunnel is up and the peer remote inside the tunnel is responding to ping
+            \return True if the remote answered within 10 ping attempts, False otherwise
+            """
+            try:
+                attempts = 10
+                ping_success = False
+                while attempts > 0:
+                    cmd = ['ping', '-c' , '1', '-w', '1', str(self.config_dict['rdv_server_ip_address'])] # Send 1 ping and give it 1s to answer
+                    rc = subprocess.call(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+                    if rc == 0:
+                        ping_success = True
+                        break   # Success, exit loop
+                    else:
+                        attempts -= 1   # One less attemps
+                if ping_success == False:
+                    raise Exception('PeerNotRespondingToPing')
+            except KeyError:
+                raise Exception('IncompleteTunnelParameters')
 
     def _get_vtun_parameters_as_dict(self):
         """ Request the vtun parameters from the RDV server and return them in a dict containing each field as a key together with its value
@@ -368,7 +391,7 @@ class TunnellingDev(object):
         \param vtund_exec (optional) The PATH to the vtund binary
         \param vtund_use_sudo (optional) A boolean indicating whether the vtund_exec needs to be run via sudo to get root access (False by default)
         \param vtun_connection_timeout How many seconds we give for the tunnel establishment (20 by default)
-        \return The resulting pythonvtunlib.client_vtun_tunnel
+        \return The resulting ClientVtunTunnelConfig object
         """
         tunnel_name = 'tundev' + str(self._ssh_username)
         config_dict = self._get_vtun_parameters_as_dict()
@@ -384,4 +407,4 @@ class TunnellingDev(object):
                                                     vtun_server_port=vtun_server_port,
                                                     vtund_exec = vtund_exec,
                                                     vtund_use_sudo = vtund_use_sudo,
-                                                    vtun_connection_timeout = vtun_connection_timeout).to_client_vtun_tunnel_object()
+                                                    vtun_connection_timeout = vtun_connection_timeout)
