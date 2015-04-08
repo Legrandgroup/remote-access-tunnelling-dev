@@ -274,7 +274,7 @@ class TunnellingDev(object):
                 self.logger.error('Remote connection closed')
                 raise Exception('SSHConnectionLost')
             elif index == 2:
-                self.logger.error('SSH forwarding failed')
+                self.logger.error('SSH forwarding failed. Please check that no other service is using TCP port ' + str(local_port) + ' (with "lsof -i" or "fuser -n tcp ' + str(local_port) + '")')
                 raise Exception('SSHForwardingFailed')
             elif index == 3:
                 self.logger.debug('Got forwarding confirmation from ssh shell')
