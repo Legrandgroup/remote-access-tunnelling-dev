@@ -29,6 +29,24 @@ class MasterDev(tundev_script.TunnellingDev):
         if self.logger.isEnabledFor(logging.DEBUG):
             print('')   # Add a carriage return after logout to allow showing the last line before we return to the caller
 
+    def run_show_online_onsite_devs(self):
+        """ Run the command show_online_onsite_devs on the remote tundev shell
+        \return The output string returned by the RDV server
+        """
+        return self._strip_trailing_cr_from(self.run_command('show_online_onsite_devs', 4))
+    
+    def get_online_onsite_dev(self):
+        """ Get a list of currently online onsite devices (using the command show_online_onsite_devs on the remote tundev shell)
+        \return An array of strings containing onsite dev ID
+        """
+        try:
+            online_onsite_dev_str = self.run_show_online_onsite_devs()
+            list = online_onsite_dev_str.split('\n')
+            return list
+        except:
+            logger.warning('Failure while parsing result from show_online_onsite_devs')
+            return []    # Ignore the exception, return an empty array
+    
 if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser(description="This program automatically connects to a RDV server as a master device. \
@@ -54,6 +72,21 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.debug(progname + ": Starting")
     master_dev = MasterDev(username='rpi1101', logger=logger)
     master_dev.rdv_server_connect()
+    remote_onsite='rpi1100' # The remote onsite dev to which we want to connect
+    unavail_onsite_msg = 'Could not connect to ' + remote_onsite + '. It is not connected (yet). Waiting'
+    while True:
+        onsite_dev_list = master_dev.get_online_onsite_dev()
+        print('Got: "' + str(onsite_dev_list) + '"')
+        if remote_onsite in onsite_dev_list:    # We saw our onsite dev available, continue
+            logger.debug(remote_onsite + ' is online... selecting this onsite and starting session')
+            break
+        else:
+            if not unavail_onsite_msg is None:
+                logger.warning(unavail_onsite_msg)
+                unavail_onsite_msg = None
+        
+        time.sleep(10)
+    
     while True:
         tunnel_mode = master_dev.run_get_tunnel_mode()
         print('Tunnel mode:"' + tunnel_mode + '"')
