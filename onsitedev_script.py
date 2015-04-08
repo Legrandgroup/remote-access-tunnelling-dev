@@ -31,7 +31,7 @@ class OnsiteDev(tundev_script.TunnellingDev):
 
 if __name__ == '__main__':
     # Parse arguments
-    parser = argparse.ArgumentParser(description="This program automatically connects to a RDV server. \
+    parser = argparse.ArgumentParser(description="This program automatically connects to a RDV server as an onsite device. \
 and automates the typing of tundev shell commands from the tunnelling devices side in order to setup a tunnel session", prog=progname)
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
     args = parser.parse_args()
