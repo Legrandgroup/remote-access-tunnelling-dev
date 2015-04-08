@@ -29,6 +29,26 @@ class OnsiteDev(tundev_script.TunnellingDev):
         if self.logger.isEnabledFor(logging.DEBUG):
             print('')   # Add a carriage return after logout to allow showing the last line before we return to the caller
 
+    def run_wait_vtun_allowed(self):
+        """ Run the command wait_vtun_allowed on the remote tundev shell
+        
+        Will block as long as we do not get a reply "ready or "reset"
+        \return True if we get a "ready" reply, meaning we can run the command get_vtun_parameters
+        \return False if we get a "reset" reply, meaning we need to start over from scratch again, and check again the tunnel mode
+        """
+        while True:
+            response = self._strip_trailing_cr_from(self.run_command('wait_vtun_allowed', 90))   # 90 here must be higher than the maximum blocking time of wait_vtun_allowed (see specs)
+            print('Got response: "' + response + '"')
+            if response == 'ready':
+                return True
+            elif response == 'reset':
+                return False
+            elif response == 'not_ready':
+                continue    # Loop again (this is the only path that would loop forever
+            else:
+                self.logger.error('Unknown reply from tundev shell command wait_vtun_allowed: ' + response)
+                raise Exception('TundevShellSyntaxError')
+
 if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser(description="This program automatically connects to a RDV server as an onsite device. \
@@ -93,8 +113,8 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         print('Tunnel was not properly setup (no ping response from peer). Output from vtund client was:\n' + session_output, file=sys.stderr)
         raise Exception('TunnelNotWorking')
     logger.debug('Tunnel to RDV server is up (got a ping reply)')
-    print('Now sleeping 15s')
-    time.sleep(15)
+    print('Now sleeping 30s')
+    time.sleep(30)
     print('...done')
     vtun_client.stop()
     session_output = vtun_client.get_output()
