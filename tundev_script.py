@@ -264,6 +264,21 @@ class TunnellingDev(object):
         elif index == 2:    # Got the ssh> escape shell prompt
             self.logger.debug('Entered in ssh escape shell CLI')
             self._exp.send(ssh_redirect_command + '\r') # Ask ssh port redirection to the remote session
+            # Now, make sure ssh has applied the port redirection.
+            # ssh escape shell could return us error string slike 'channel_setup_fwd_listener:'. This would happen if a zombie ssh connection remains, for example after having sent a SIGKILL to this python script while the tunnel was up
+            # Note: Even when we get such errors, we will also get the message 'Forwarding port', so we must detect the error, not the false-positive confirmation
+            index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, '(?i)channel_setup_fwd_listener.*cannot listen', '(?i)forwarding port', ], timeout=2)    # ?i allows us to perform case insensitive matching
+            if index == 0:
+                self.logger.warning('Could not get confirmation from ssh shell that forwarding was successful. Assuming everything is OK')
+            elif index == 1:
+                self.logger.error('Remote connection closed')
+                raise Exception('SSHConnectionLost')
+            elif index == 2:
+                self.logger.error('SSH forwarding failed')
+                raise Exception('SSHForwardingFailed')
+            elif index == 3:
+                self.logger.debug('Got forwarding confirmation from ssh shell')
+        
         self.run_command('echo ...done')    # Run a dummy command to make sure we got back to ssh shell
     
     def run_set_tunnelling_dev_lan_ip_address(self, ip):
