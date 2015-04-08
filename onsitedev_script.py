@@ -52,7 +52,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.propagate = False
     
     logger.debug(progname + ": Starting")
-    onsite_dev = OnsiteDev(username='rpi1001', logger=logger)
+    onsite_dev = OnsiteDev(username='rpi1100', logger=logger)
     onsite_dev.rdv_server_connect()
     tunnel_mode = onsite_dev.run_get_tunnel_mode()
     print('Tunnel mode:"' + tunnel_mode + '"')
@@ -76,6 +76,13 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         vtun_client_config.check_ping_peer()
     except:
         logger.error('Peer does not respond to pings inside the tunnel')
+        session_output = vtun_client.get_output()
+        session_output = '|' + session_output.replace('\n', '\n|')  # Prefix the whole output with a | character so that dump is easily spotted
+        if session_output.endswith('|'):    # Remove the last line that only contains a | character
+            session_output = session_output[:-1]
+        while session_output.endswith('|\n'):   # Get rid of the last empty line(s) that is/are present most of the time
+            session_output = session_output[:-2]
+        print('Tunnel was not properly setup (no ping response from peer). Output from vtund client was:\n' + session_output, file=sys.stderr)
         raise Exception('TunnelNotWorking')
     logger.debug('Tunnel to RDV server is up (got a ping reply)')
     print('Now sleeping 15s')
@@ -88,5 +95,5 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         session_output = session_output[:-1]
     while session_output.endswith('|\n'):   # Get rid of the last empty line(s) that is/are present most of the time
         session_output = session_output[:-2]
-    print('vtun command output was:\n' + session_output , file=sys.stderr)
+    print('Now exitting tundev script. For debug, output from vtund client was:\n' + session_output , file=sys.stderr)
     onsite_dev.exit()
