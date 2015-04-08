@@ -79,7 +79,6 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         print('Tunnel mode:"' + tunnel_mode + '"')
         onsite_dev.send_lan_ip_address_for_iface('eth0')
         onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
-        print('Got: "' + onsite_dev.run_command('echo bla') + '"')
         logger.info('Waiting for a master to request us to start our vtun tunnel to the RDV server')
         if onsite_dev.run_wait_master_connection():
             logger.info('RDV server allowed vtun tunnel')
