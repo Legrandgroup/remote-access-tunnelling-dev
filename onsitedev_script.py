@@ -29,15 +29,15 @@ class OnsiteDev(tundev_script.TunnellingDev):
         if self.logger.isEnabledFor(logging.DEBUG):
             print('')   # Add a carriage return after logout to allow showing the last line before we return to the caller
 
-    def run_wait_vtun_allowed(self):
-        """ Run the command wait_vtun_allowed on the remote tundev shell
+    def run_wait_master_connection(self):
+        """ Run the command wait_master_connection on the remote tundev shell
         
         Will block as long as we do not get a reply "ready or "reset"
         \return True if we get a "ready" reply, meaning we can run the command get_vtun_parameters
         \return False if we get a "reset" reply, meaning we need to start over from scratch again, and check again the tunnel mode
         """
         while True:
-            response = self._strip_trailing_cr_from(self.run_command('wait_vtun_allowed', 90))   # 90 here must be higher than the maximum blocking time of wait_vtun_allowed (see specs)
+            response = self._strip_trailing_cr_from(self.run_command('wait_master_connection', 90))   # 90 here must be higher than the maximum blocking time of wait_master_connection (see specs)
             print('Got response: "' + response + '"')
             if response == 'ready':
                 return True
@@ -46,7 +46,7 @@ class OnsiteDev(tundev_script.TunnellingDev):
             elif response == 'not_ready':
                 continue    # Loop again (this is the only path that would loop forever
             else:
-                self.logger.error('Unknown reply from tundev shell command wait_vtun_allowed: ' + response)
+                self.logger.error('Unknown reply from tundev shell command wait_master_connection: ' + response)
                 raise Exception('TundevShellSyntaxError')
 
 if __name__ == '__main__':
@@ -80,12 +80,12 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         onsite_dev.send_lan_ip_address_for_iface('eth0')
         onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
         print('Got: "' + onsite_dev.run_command('echo bla') + '"')
-        logger.info('Waiting for vtun tunnel to be allowed by RDV server')
-        if onsite_dev.run_wait_vtun_allowed():
+        logger.info('Waiting for a master to request us to start our vtun tunnel to the RDV server')
+        if onsite_dev.run_wait_master_connection():
             logger.info('RDV server allowed vtun tunnel')
             break   # This is the only path out, if we get False, we will start again from scratch (as a reply to the 'reset' response)
         else:
-            logger.warning('RDV server asked us to restart by sending us a wait_vtun_allowed reply "reset"')
+            logger.warning('RDV server asked us to restart by sending us a wait_master_connection reply containing "reset"')
     
     locally_redirected_vtun_server_port = 5000
     vtun_client_config = onsite_dev.get_client_vtun_tunnel(tunnel_mode,
