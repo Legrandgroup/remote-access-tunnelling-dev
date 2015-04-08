@@ -305,6 +305,27 @@ class TunnellingDev(object):
         """
         self.run_command('set_tunnelling_dev_uplink_type ' + str(uplink_type), 2)
     
+    def run_wait_vtun_allowed(self):
+        """ Run the command wait_vtun_allowed on the remote tundev shell
+        
+        Will block as long as we do not get a reply "ready or "reset"
+        \return True if we get a "ready" reply, meaning we can run the command get_vtun_parameters
+        \return False if we get a "reset" reply, meaning we need to start over from scratch again, and check again the tunnel mode
+        """
+        while True:
+            response = self._strip_trailing_cr_from(self.run_command('wait_vtun_allowed', 90))   # 90 here must be higher than the maximum blocking time of wait_vtun_allowed (see specs)
+            print('Got response: "' + response + '"')
+            if response == 'ready':
+                return True
+            elif response == 'reset':
+                return False
+            elif response == 'not_ready':
+                print('Continuing in wait_vtun_allowed loop')
+                continue    # Loop again (this is the only path that would loop forever
+            else:
+                self.logger.error('Unknown reply from tundev shell command wait_vtun_allowed: ' + response)
+                raise Exception('TundevShellSyntaxError')
+        
     def run_get_vtun_parameters(self):
         """ Run the command get_tunnel_mode on the remote tundev shell
         \return The vtun config output string returned by the RDV server

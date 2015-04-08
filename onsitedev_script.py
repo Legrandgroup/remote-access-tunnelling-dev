@@ -54,11 +54,19 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.debug(progname + ": Starting")
     onsite_dev = OnsiteDev(username='rpi1100', logger=logger)
     onsite_dev.rdv_server_connect()
-    tunnel_mode = onsite_dev.run_get_tunnel_mode()
-    print('Tunnel mode:"' + tunnel_mode + '"')
-    onsite_dev.send_lan_ip_address_for_iface('eth0')
-    onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
-    print('Got: "' + onsite_dev.run_command('echo bla') + '"')
+    while True:
+        tunnel_mode = onsite_dev.run_get_tunnel_mode()
+        print('Tunnel mode:"' + tunnel_mode + '"')
+        onsite_dev.send_lan_ip_address_for_iface('eth0')
+        onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
+        print('Got: "' + onsite_dev.run_command('echo bla') + '"')
+        logger.info('Waiting for vtun tunnel to be allowed by RDV server')
+        if onsite_dev.run_wait_vtun_allowed():
+            logger.info('RDV server allowed vtun tunnel')
+            break   # This is the only path out, if we get False, we will start again from scratch (as a reply to the 'reset' response)
+        else:
+            logger.warning('RDV server asked us to restart by sending us a wait_vtun_allowed reply "reset"')
+    
     locally_redirected_vtun_server_port = 5000
     vtun_client_config = onsite_dev.get_client_vtun_tunnel(tunnel_mode,
                                                            vtun_server_hostname='127.0.0.1',
