@@ -41,6 +41,8 @@ class MasterDev(tundev_script.TunnellingDev):
         """
         try:
             online_onsite_dev_str = self.run_show_online_onsite_devs()
+            if online_onsite_dev_str == '':
+                return []
             list = online_onsite_dev_str.split('\n')
             return list
         except:
