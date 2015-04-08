@@ -48,6 +48,12 @@ class MasterDev(tundev_script.TunnellingDev):
         except:
             logger.warning('Failure while parsing result from show_online_onsite_devs')
             return []    # Ignore the exception, return an empty array
+
+    def run_connect_to_onsite_dev(self, id):
+        """ Run the command connect_to_onsite_dev on the remote tundev shell, using \p id as the target onsite dev 
+        \param id The ID of the remote onsite dev we want to connect to
+        """
+        self.run_command('connect_to_onsite_dev ' + str(id), 4)
     
 if __name__ == '__main__':
     # Parse arguments
@@ -80,7 +86,6 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         onsite_dev_list = master_dev.get_online_onsite_dev()
         print('Got: "' + str(onsite_dev_list) + '"')
         if remote_onsite in onsite_dev_list:    # We saw our onsite dev available, continue
-            logger.debug(remote_onsite + ' is online... selecting this onsite and starting session')
             break
         else:
             if not unavail_onsite_msg is None:
@@ -88,6 +93,9 @@ and automates the typing of tundev shell commands from the tunnelling devices si
                 unavail_onsite_msg = None
         
         time.sleep(10)
+    
+    logger.debug('Selecting onsite dev ' + remote_onsite + ' for this session')
+    master_dev.run_connect_to_onsite_dev(remote_onsite) # Now connect to this remote
     
     while True:
         tunnel_mode = master_dev.run_get_tunnel_mode()
