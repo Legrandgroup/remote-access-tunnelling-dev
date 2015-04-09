@@ -85,9 +85,10 @@ class TunnellingDev(object):
         This method will raise exceptions in case of failure
         \param timeout How long (in secs) are we ready to wait for the prompt
         """
-        expect_list = [pexpect.TIMEOUT, pexpect.EOF, self._prompt]
+        expect_list = [pexpect.TIMEOUT, pexpect.EOF]
         if exception_on_cmd_syntax_error:   # If we also need to catch syntax error messages...
             expect_list += ['[*][*][*] Unknown syntax:']
+        expect_list += [self._prompt]
         
         index = self._exp.expect(expect_list, timeout=timeout)
         if index == 0:    # Timeout
@@ -96,10 +97,15 @@ class TunnellingDev(object):
         elif index == 1:    # EOF
             self.logger.error("Remote connection closed")
             raise Exception('SSHConnectionLost')
-        elif index == 2:    # linux_prompt_catchall_regexp a second time
-            pass    # We are now sure we are logged in now
-        elif index == 3 and exception_on_cmd_syntax_error:
+        elif index == 2 and exception_on_cmd_syntax_error:
             raise Exception('TundevShellSyntaxError')
+        else:
+            if exception_on_cmd_syntax_error:
+                index -= 1	# Remove the inserted syntax error regexp to have common test whatever the value of exception_on_cmd_syntax_error is (expected index should be 2 or 3 if exception)
+            if index == 2:    # linux_prompt_catchall_regexp a second time
+                pass    # We are now sure we are logged in now
+            else:	# Something is wrong in the index returned
+                raise Exception('WrongInternalExpIndex:' + str(index))
     
     def rdv_server_connect(self):
         """ Initiate the ssh connection to the RDV server
