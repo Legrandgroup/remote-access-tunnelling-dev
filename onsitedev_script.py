@@ -80,7 +80,6 @@ and automates the typing of tundev shell commands from the tunnelling devices si
 
     while True:
         tunnel_mode = onsite_dev.run_get_tunnel_mode()
-        print('Tunnel mode:"' + tunnel_mode + '"')
         onsite_dev.send_lan_ip_address_for_iface('eth0')
         onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
         logger.info('Waiting for a master to request us to start our vtun tunnel to the RDV server')

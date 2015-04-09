@@ -104,7 +104,6 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         raise Exception('RoleMismatch')
     
     tunnel_mode = master_dev.run_get_tunnel_mode()
-    print('Tunnel mode:"' + tunnel_mode + '"')
     
     locally_redirected_vtun_server_port = 5000
     vtun_client_config = master_dev.get_client_vtun_tunnel(tunnel_mode,
