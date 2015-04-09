@@ -84,7 +84,6 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     unavail_onsite_msg = 'Could not connect to ' + remote_onsite + '. It is not connected (yet). Waiting'
     while True:
         onsite_dev_list = master_dev.get_online_onsite_dev()
-        print('Got: "' + str(onsite_dev_list) + '"')
         if remote_onsite in onsite_dev_list:    # We saw our onsite dev available, continue
             break
         else:
@@ -96,7 +95,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     master_dev.send_lan_ip_address_for_iface('eth0')
     #master_dev.run_set_tunnelling_dev_uplink_type('lan')
-    logger.debug('Selecting onsite dev ' + remote_onsite + ' for this session')
+    logger.info('Selecting onsite dev ' + remote_onsite + ' for this session')
     master_dev.run_connect_to_onsite_dev(remote_onsite) # Now connect to this remote
     
     # Sanity check
