@@ -94,6 +94,8 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         
         time.sleep(10)
     
+    master_dev.send_lan_ip_address_for_iface('eth0')
+    #master_dev.run_set_tunnelling_dev_uplink_type('lan')
     logger.debug('Selecting onsite dev ' + remote_onsite + ' for this session')
     master_dev.run_connect_to_onsite_dev(remote_onsite) # Now connect to this remote
     
@@ -104,8 +106,6 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     tunnel_mode = master_dev.run_get_tunnel_mode()
     print('Tunnel mode:"' + tunnel_mode + '"')
-    master_dev.send_lan_ip_address_for_iface('eth0')
-    master_dev.run_set_tunnelling_dev_uplink_type('lan')
     
     locally_redirected_vtun_server_port = 5000
     vtun_client_config = master_dev.get_client_vtun_tunnel(tunnel_mode,
