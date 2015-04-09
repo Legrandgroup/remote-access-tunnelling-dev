@@ -312,6 +312,8 @@ class TunnellingDev(object):
         role = self._strip_trailing_cr_from(self.run_command('get_role', 2))
         if role == '':
             raise Exception('TundevShellSyntaxError')
+        else:
+            return role
     
     def run_get_tunnel_mode(self):
         """ Run the command get_tunnel_mode on the remote tundev shell
@@ -320,6 +322,8 @@ class TunnellingDev(object):
         mode = self._strip_trailing_cr_from(self.run_command('get_tunnel_mode', 2))
         if mode == '':
             raise Exception('TundevShellSyntaxError')
+        else:
+            return mode
     
     def run_set_tunnelling_dev_uplink_type(self, uplink_type):
         """ Run the command set_tunnelling_dev_uplink_type on the remote tundev shell
