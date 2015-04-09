@@ -293,6 +293,12 @@ class TunnellingDev(object):
         """
         self.run_set_tunnelling_dev_lan_ip_address(self._get_ip_network(iface))
 
+    def run_get_role(self):
+        """ Run the command get_role on the remote tundev shell
+        \return The role as a string
+        """
+        return self._strip_trailing_cr_from(self.run_command('get_role', 2))
+    
     def run_get_tunnel_mode(self):
         """ Run the command get_tunnel_mode on the remote tundev shell
         \return The tunnel mode as a string
