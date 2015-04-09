@@ -78,14 +78,18 @@ class TunnellingDev(object):
         
         return ipaddr.IPv4Network(str(ip) + '/' + str(netmask)) 
     
-    def catch_prompt(self, timeout = 2):
+    def catch_prompt(self, timeout = 2, exception_on_cmd_syntax_error = False):
         """ Wait for a remote prompt to appear
         
         Note: the expected prompt is stored in attribute self._prompt
         This method will raise exceptions in case of failure
         \param timeout How long (in secs) are we ready to wait for the prompt
         """
-        index = self._exp.expect([pexpect.TIMEOUT, pexpect.EOF, self._prompt], timeout=timeout)
+        expect_list = [pexpect.TIMEOUT, pexpect.EOF, self._prompt]
+        if exception_on_cmd_syntax_error:   # If we also need to catch syntax error messages...
+            expect_list += ['*** Unknown syntax:']
+        
+        index = self._exp.expect(expect_list, timeout=timeout)
         if index == 0:    # Timeout
             self.logger.error("Remote connection is frozen")
             raise Exception('SSHConnectionLost')
@@ -94,6 +98,8 @@ class TunnellingDev(object):
             raise Exception('SSHConnectionLost')
         elif index == 2:    # linux_prompt_catchall_regexp a second time
             pass    # We are now sure we are logged in now
+        elif index == 3 and exception_on_cmd_syntax_error:
+            raise Exception('TundevShellSyntaxError')
     
     def rdv_server_connect(self):
         """ Initiate the ssh connection to the RDV server
@@ -162,7 +168,7 @@ class TunnellingDev(object):
             #self._exp.buffer = ''
             #self._exp.before = ''   # Eat all preceeding input
             self._exp.send(command + '\r')
-            self.catch_prompt(timeout=prompt_timeout)
+            self.catch_prompt(timeout=prompt_timeout, exception_on_cmd_syntax_error=True)
             output = str(self._exp.before)
             # Now, in output, we might have the whole command included (most terminals do echo what is typed in)
             if output.startswith(command):
