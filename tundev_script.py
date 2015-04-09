@@ -87,7 +87,7 @@ class TunnellingDev(object):
         """
         expect_list = [pexpect.TIMEOUT, pexpect.EOF, self._prompt]
         if exception_on_cmd_syntax_error:   # If we also need to catch syntax error messages...
-            expect_list += ['*** Unknown syntax:']
+            expect_list += ['[*][*][*] Unknown syntax:']
         
         index = self._exp.expect(expect_list, timeout=timeout)
         if index == 0:    # Timeout
