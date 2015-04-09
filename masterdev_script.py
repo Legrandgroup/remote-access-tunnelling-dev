@@ -97,6 +97,11 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.debug('Selecting onsite dev ' + remote_onsite + ' for this session')
     master_dev.run_connect_to_onsite_dev(remote_onsite) # Now connect to this remote
     
+    # Sanity check
+    if master_dev.run_get_role() != 'master':
+        logger.error('Tundev shell returns a role that does not match this script (master)')
+        raise Exception('RoleMismatch')
+    
     tunnel_mode = master_dev.run_get_tunnel_mode()
     print('Tunnel mode:"' + tunnel_mode + '"')
     master_dev.send_lan_ip_address_for_iface('eth0')

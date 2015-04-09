@@ -74,6 +74,11 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.debug(progname + ": Starting")
     onsite_dev = OnsiteDev(username='rpi1100', logger=logger)
     onsite_dev.rdv_server_connect()
+    # Sanity check
+    if onsite_dev.run_get_role() != 'onsite':
+        logger.error('Tundev shell returns a role that does not match this script (onsite)')
+        raise Exception('RoleMismatch')
+
     while True:
         tunnel_mode = onsite_dev.run_get_tunnel_mode()
         print('Tunnel mode:"' + tunnel_mode + '"')
