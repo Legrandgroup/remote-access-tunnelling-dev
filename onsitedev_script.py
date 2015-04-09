@@ -38,7 +38,6 @@ class OnsiteDev(tundev_script.TunnellingDev):
         """
         while True:
             response = self._strip_trailing_cr_from(self.run_command('wait_master_connection', 90))   # 90 here must be higher than the maximum blocking time of wait_master_connection (see specs)
-            print('Got response: "' + response + '"')
             if response == 'ready':
                 return True
             elif response == 'reset':
