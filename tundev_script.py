@@ -297,13 +297,17 @@ class TunnellingDev(object):
         """ Run the command get_role on the remote tundev shell
         \return The role as a string
         """
-        return self._strip_trailing_cr_from(self.run_command('get_role', 2))
+        role = self._strip_trailing_cr_from(self.run_command('get_role', 2))
+        if role == '':
+            raise Exception('TundevShellSyntaxError')
     
     def run_get_tunnel_mode(self):
         """ Run the command get_tunnel_mode on the remote tundev shell
         \return The tunnel mode as a string
         """
-        return self._strip_trailing_cr_from(self.run_command('get_tunnel_mode', 2))
+        mode = self._strip_trailing_cr_from(self.run_command('get_tunnel_mode', 2))
+        if mode == '':
+            raise Exception('TundevShellSyntaxError')
     
     def run_set_tunnelling_dev_uplink_type(self, uplink_type):
         """ Run the command set_tunnelling_dev_uplink_type on the remote tundev shell
