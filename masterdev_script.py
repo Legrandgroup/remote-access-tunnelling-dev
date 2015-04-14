@@ -113,8 +113,8 @@ and automates the typing of tundev shell commands from the tunnelling devices si
                                                            vtund_use_sudo=True)  # Returns a pythonvtunlib.client_vtun_tunnel object
     
     #We get the additionnal commands for up and down bloc kon the client side (mainly routing purpose commands)
-    up_commands = onsite_dev.run_get_vtun_client_up_additionnal_commands()
-    down_commands = onsite_dev.run_get_vtun_client_down_additionnal_commands()
+    up_commands = master_dev.run_get_vtun_client_up_additionnal_commands()
+    down_commands = master_dev.run_get_vtun_client_down_additionnal_commands()
     
     vtun_client = vtun_client_config.to_client_vtun_tunnel_object()
     master_dev._assert_ssh_escape_shell()
