@@ -106,15 +106,19 @@ class TunnellingDev(object):
             else:	# Something is wrong in the index returned
                 raise Exception('WrongInternalExpIndex:' + str(index))
     
-    def rdv_server_connect(self):
+    def rdv_server_connect(self, using_stunnel = False):
         """ Initiate the ssh connection to the RDV server
         This method will raise exceptions in case of failure
+        \param using_stunnel A boolean to indicate to connect to RDVServer directly over SSH or to use a local stunnel instead
         """
         
         if not self._ssh_key_filename is None:
             logger.error('Providing a ssh key filename is not yet supported')
             raise('SSHKeyFilenameNotSupported')
-        self._exp = pexpect.spawn('ssh', ['-oUserKnownHostsFile=/dev/null', '-oStrictHostKeyChecking=no', self._ssh_username + '@' + self._rdv_server])
+        if using_stunnel:
+            self._exp = pexpect.spawn('ssh', ['-oUserKnownHostsFile=/dev/null', '-oStrictHostKeyChecking=no', '-p 222', self._ssh_username + '@localhost'])
+        else:
+            self._exp = pexpect.spawn('ssh', ['-oUserKnownHostsFile=/dev/null', '-oStrictHostKeyChecking=no', self._ssh_username + '@' + self._rdv_server])
         supposedly_logged_in = False
         surely_logged_in = False
         

@@ -60,6 +60,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="This program automatically connects to a RDV server as a master device. \
 and automates the typing of tundev shell commands from the tunnelling devices side in order to setup a tunnel session", prog=progname)
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
+    parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
     args = parser.parse_args()
 
     # Setup logging
@@ -79,7 +80,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     logger.debug(progname + ": Starting")
     master_dev = MasterDev(username='rpi1101', logger=logger)
-    master_dev.rdv_server_connect()
+    master_dev.rdv_server_connect(using_stunnel=args.with_stunnel)
     remote_onsite='rpi1100' # The remote onsite dev to which we want to connect
     unavail_onsite_msg = 'Could not connect to ' + remote_onsite + '. It is not connected (yet). Waiting'
     while True:

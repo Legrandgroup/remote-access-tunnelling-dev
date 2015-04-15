@@ -53,6 +53,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="This program automatically connects to a RDV server as an onsite device. \
 and automates the typing of tundev shell commands from the tunnelling devices side in order to setup a tunnel session", prog=progname)
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
+    parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
     args = parser.parse_args()
 
     # Setup logging
@@ -72,7 +73,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     logger.debug(progname + ": Starting")
     onsite_dev = OnsiteDev(username='rpi1100', logger=logger)
-    onsite_dev.rdv_server_connect()
+    onsite_dev.rdv_server_connect(using_stunnel=args.with_stunnel)
     # Sanity check
     if onsite_dev.run_get_role() != 'onsite':
         logger.error('Tundev shell returns a role that does not match this script (onsite)')
