@@ -340,17 +340,17 @@ class TunnellingDev(object):
         """
         return self._strip_trailing_cr_from(self.run_command('get_vtun_parameters', 20))
     
-    def run_get_vtun_client_up_additionnal_commands(self):
-        """ Run the command get_vtun_client_up_additionnal_commands on the remote tundev shell
+    def run_get_vtun_client_up_additional_commands(self):
+        """ Run the command get_vtun_client_up_additional_commands on the remote tundev shell
         \return The commands to add to the up block of vtun client side configuration file
         """
-        return self._strip_trailing_cr_from(self.run_command('get_vtun_client_up_additionnal_commands')).split('\n')
+        return self._strip_trailing_cr_from(self.run_command('get_vtun_client_up_additional_commands')).split('\n')
     
-    def run_get_vtun_client_down_additionnal_commands(self):
-        """ Run the command get_vtun_client_down_additionnal_commands on the remote tundev shell
+    def run_get_vtun_client_down_additional_commands(self):
+        """ Run the command get_vtun_client_down_additional_commands on the remote tundev shell
         \return The commands to add to the down block of vtun client side configuration file
         """
-        return self._strip_trailing_cr_from(self.run_command('get_vtun_client_down_additionnal_commands')).split('\n')
+        return self._strip_trailing_cr_from(self.run_command('get_vtun_client_down_additional_commands')).split('\n')
     
     class ClientVtunTunnelConfig(object):
         """ Class representing a tunnelling device configuration as provided by the remote tundev shell command get_vtun_parameters
