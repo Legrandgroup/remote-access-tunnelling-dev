@@ -25,7 +25,7 @@ class TunnellingDev(object):
     A tunnelling device is a abstract device gathering client devices or server devices
     """
     
-    PROTO_RDV_SERVER = '10.10.8.11'
+    PROTO_RDV_SERVER = '88.170.42.228'
     SSH_ESCAPE_SHELL_PROMPT = 'ssh> '
                 
     def __init__(self, username, logger, key_filename = None, prompt = None):
