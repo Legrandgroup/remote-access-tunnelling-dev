@@ -69,7 +69,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
     parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
     parser.add_argument('-m', '--tunnel-mode', dest='tunnel_mode', action='store_true', help='the OSI level for the tunnel (L2 or L3)', default='L3')
-    parser.add_argument('-t', '--session-time', dest='session_time', action='store_true', help='specify session duration (in seconds)', default=120)
+    parser.add_argument('-t', '--session-time', type=int, dest='session_time', help='specify session duration (in seconds)', default=120)
     args = parser.parse_args()
 
     # Setup logging
