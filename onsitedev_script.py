@@ -54,6 +54,7 @@ if __name__ == '__main__':
 and automates the typing of tundev shell commands from the tunnelling devices side in order to setup a tunnel session", prog=progname)
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
     parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
+    parser.add_argument('-t', '--session-time', dest='session_time', action='store_true', help='specify session duration (in seconds)', default=120)
     args = parser.parse_args()
 
     # Setup logging
@@ -129,8 +130,8 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         print('Tunnel was not properly setup (no ping response from peer). Output from vtund client was:\n' + session_output, file=sys.stderr)
         raise Exception('TunnelNotWorking')
     logger.debug('Tunnel to RDV server is up (got a ping reply)')
-    print('Now sleeping 2min')
-    time.sleep(120)
+    print('Now sleeping ' + str(args.session_time/60) + ' min ' + str(args.session_time%60) + ' s')
+    time.sleep(args.session_time)
     print('...done')
     vtun_client.stop()
     session_output = vtun_client.get_output()
