@@ -13,6 +13,8 @@ import logging
 
 import time
 
+import threading
+
 progname = os.path.basename(sys.argv[0])
 
 class OnsiteDev(tundev_script.TunnellingDev):
@@ -145,19 +147,21 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         print('Waiting until issue on vtund client or ssh session')
         
         #We prepare and event to be set when either ssh or vtun client falls down
-        event_down = Threading.Event()
+        event_down = threading.Event()
         event_down.clear()
         
         #Thread to run to wait a process to end and then set the event
         class processWaiter(threading.Thread):
             def __init__(self, process_to_wait):
+                super(processWaiter,self).__init__()
+                self.setDaemon(True)
                 self._process = process_to_wait
             def run(self):
                 self._process.wait()
                 event_down.set()
         
         #Create 2 of those thread : one for ssh and one for vtun client
-        ssh_waiter = processWaiter(self.get_ssh_process())
+        ssh_waiter = processWaiter(onsite_dev.get_ssh_process())
         vtun_client_waiter = processWaiter(vtun_client._vtun_process) #FIXME: Change python vtunlib in order to remove the direct access to 'private' attribute
         
         #Launch those threads
