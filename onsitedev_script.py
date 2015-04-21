@@ -110,23 +110,12 @@ and automates the typing of tundev shell commands from the tunnelling devices si
                                                            vtund_exec='/usr/local/sbin/vtund',
                                                            vtund_use_sudo=True)  # Returns a pythonvtunlib.client_vtun_tunnel object
     
-    #We get the additional commands for up and down block on the client side (mainly routing purpose commands)
-    up_commands = onsite_dev.run_get_vtun_client_up_additional_commands()
-    down_commands = onsite_dev.run_get_vtun_client_down_additional_commands()
-    
     vtun_client = vtun_client_config.to_client_vtun_tunnel_object()
     onsite_dev._assert_ssh_escape_shell()
     logger.debug('Adding ssh port redirection to ssh session')
     onsite_dev.ssh_port_forward(locally_redirected_vtun_server_port,
                                 onsite_dev.ssh_remote_tcp_port)
-    
-    #We add those commands to the configuration file
-    for command in up_commands:
-        vtun_client.add_up_command(command)
-    
-    for command in down_commands:
-        vtun_client.add_down_command(command)
-    
+        
     vtun_client.start()
     logger.debug('Started local vtun client as PID ' + str(vtun_client._vtun_pid))
     try:
