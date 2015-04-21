@@ -14,6 +14,7 @@ import logging
 import time
 
 import threading
+import signal
 
 progname = os.path.basename(sys.argv[0])
 
@@ -141,6 +142,10 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         event_down = threading.Event()
         event_down.clear()
         
+        #To set the event if we catch SIGINT, SIGTERM or SIGQUIT
+        def signalHandler(signum, frame):
+            event_down.set()
+        
         #Thread to run to wait a process to end and then set the event
         class processWaiter(threading.Thread):
             def __init__(self, process_to_wait):
@@ -159,8 +164,17 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         ssh_waiter.start()
         vtun_client_waiter.start()
         
+        #We connect signal to handler
+        signal.signal(signal.SIGINT, signalHandler)
+        signal.signal(signal.SIGTERM, signalHandler)
+        signal.signal(signal.SIGQUIT, signalHandler)
+        
         #We wait for the event in block mode and therefore the session will last 'forever' if neither ssh nor vtun client falls down 
         event_down.wait()
+        #We disconnect signal from handler
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        signal.signal(signal.SIGQUIT, signal.SIG_DFL)
     
     print('...done')
     vtun_client.stop()
