@@ -85,39 +85,71 @@ class TunnellingDev(object):
         
         return ipaddr.IPv4Network(str(ip) + '/' + str(netmask)) 
 
-    def add_host_route(self, host_ip, iface):
+    def add_host_route(self, host_ip, iface, ip_use_sudo = False):
         """ Add a route to a specific host to the default routing table
         \param host_ip The IP address of the host
         \param iface The network interface on which to reach the host
+        \param ip_use_sudo Use sudo to run the ip command
         """
-        host_ip = ipaddr.IPv4Address(host_ip)   # Convert to an IPv4Address object (this also check the validity of this IP address)
-        cmd = ['sudo', 'ip', 'route', 'list']
-        """
-        default via 10.10.16.3 dev eth0
-        10.10.16.0/21 dev eth0  proto kernel  scope link  src 10.10.16.68
-        10.64.64.64 dev ppp0  proto kernel  scope link  src 10.162.249.233
-        """
-        regexp1 = r'^.*[[:blank:]]+via[[:blank:]]+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)[[:blank:]].*dev[[:blank:]]+([^[:blank:]]+)[[:blank:]].*$'
-        regexp2 = r'^[[:blank:]]*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)[[:blank:]].*dev[[:blank:]]+([^[:blank:]]+)[[:blank:]].*$'
-        subproc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=open(os.devnull, 'wb'))
-        for line in subproc.stdout:
-            print('Got line "' + line + '"')
-            match = re.match(regexp1, line) # Try the via (gateway) route pattern
-            if match:
-                if match.group(2) == iface: # This is the entry for the interface we are interested on
-                    dest = match.group(1)
-                    print('Got dest="' + dest + '"')
-            else:
-                match = re.match(regexp2, line) # Trye the peer-to-peer (tunnel) route pattern
-                if match:
-                    if match.group(2) == iface: # This is the entry for the interface we are interested on
-                        dest = match.group(1)
-                        print('Got dest="' + dest + '"')
-        print('Doing nothing')
         
-        # Run subprocess.check_call()
-        # Parse output
-        # Check rc value
+        # FIXME: we should keep track of whether the route has been added, and be able to remove it if the process stops (to leave everything as before when leaving)
+        
+        host_ip = ipaddr.IPv4Address(host_ip)   # Convert to an IPv4Address object (this also check the validity of this IP address)
+        
+        cmd = []
+        if ip_use_sudo:
+            cmd += ['sudo']
+        
+        cmd += ['ip', 'route', 'list']
+        
+        if not iface:
+            raise Exception('InvalidArgument')
+        
+        regexp1 = r'([^\s]+)\s+via\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\s.*dev\s+([^\s]+).*'
+        regexp2 = r'\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\s.*dev\s+([^\s]+).*'
+        next_hop = None
+        subproc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=open(os.devnull, 'wb'))
+        for rule in subproc.stdout:
+            print('Got line "' + rule + '"')
+            match = re.match(regexp1, rule) # Try the via (gateway) route pattern
+            if match:
+                print('Match1')
+                if match.group(3) == iface: # Does this entry for the interface we are interested on
+                    rule_router = match.group(2)   # Match 2 of regexp1 is the next hop router
+                    rule_target = match.group(1) # Match 1 of regexp1 is the rule's destination host or network
+                    if (rule_target == str(host_ip) or
+                        rule_target == str(host_ip) + '/32'):  # The rule we are going to enter is already in the routing table
+                        self.logger.warning('Routing rule for host ' + str(host_ip) + ' on interface ' + iface + ' already exists')
+                        return
+                    
+                    print('Seen a route to ' + rule_target)
+                    if next_hop is None:
+                        next_hop = ipaddr.IPv4Address(rule_router)
+                    elif rule_router != str(next_hop):
+                        self.logger.warning('Got multiple next hop routers on interface ' + iface + '. Using the first one (' + str(next_hop) + ')')
+            else:
+                match = re.match(regexp2, rule) # Try the peer-to-peer (tunnel) route pattern
+                if match:
+                    print('Match2')
+                    if match.group(2) == iface: # This is the entry for the interface we are interested on
+                        rule_router = match.group(1)   # Match 1 of regexp2 is the next hop router
+                        if next_hop is None or next_hop == rule_router:
+                            next_hop = ipaddr.IPv4Address(rule_router)
+                        elif rule_router != str(next_hop):
+                            self.logger.warning('Got multiple next hop routers on interface ' + iface + '. Using the first one (' + str(next_hop) + ')')
+        
+        if next_hop is None:
+            raise Exception('NoRouterOnInterface:' + iface)
+        else:
+            self.logger.debug('Selecting next hop router ' + str(next_hop) + ' for interface ' + iface)
+        
+        cmd = []
+        if ip_use_sudo:
+            cmd += ['sudo']
+        
+        self.logger.info('Adding routing rule for host ' + str(host_ip) + ' via next hop router ' + str(next_hop) + ' on interface ' + iface)
+        cmd += ['sudo', 'ip', 'route', 'add', str(host_ip), 'via', str(next_hop), 'dev', iface] # Run ip to add the new host route
+        subprocess.check_call(cmd)
 
     def catch_prompt(self, timeout = 2, exception_on_cmd_syntax_error = False):
         """ Wait for a remote prompt to appear

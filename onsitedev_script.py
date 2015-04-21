@@ -78,6 +78,10 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     logger.debug(progname + ": Starting")
     onsite_dev = OnsiteDev(username='rpi1100', logger=logger)
+    
+    if not args.uplink_dev_3g is None:  # We must add the specific route to the rdv server before we execute rdv_server_connect()
+        onsite_dev.add_host_route(host_ip=onsite_dev.get_rdv_server(), iface=args.uplink_dev_3g, ip_use_sudo=True)
+        
     onsite_dev.rdv_server_connect(using_stunnel=args.with_stunnel)
     # Sanity check
     if onsite_dev.run_get_role() != 'onsite':
@@ -90,9 +94,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         if args.uplink_dev_3g is None:
             onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
         else:
-            onsite_dev.add_host_route(onsite_dev.get_rdv_server(), args.uplink_dev_3g)
             onsite_dev.run_set_tunnelling_dev_uplink_type('3g')
-            raise NotImplementedError('Lionel: WIP, do not use 3g mode please')
         
         logger.info('Waiting for a master to request us to start our vtun tunnel to the RDV server')
         if onsite_dev.run_wait_master_connection():
