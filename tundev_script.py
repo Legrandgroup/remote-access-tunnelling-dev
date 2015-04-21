@@ -18,6 +18,8 @@ import socket, struct, fcntl    # For get_ip()
 import os
 import subprocess
 
+import re
+
 from pythonvtunlib import client_vtun_tunnel
 
 class TunnellingDev(object):
@@ -28,14 +30,14 @@ class TunnellingDev(object):
     PROTO_RDV_SERVER = '88.170.42.228'
     SSH_ESCAPE_SHELL_PROMPT = 'ssh> '
                 
-    def __init__(self, username, logger, key_filename = None, prompt = None):
+    def __init__(self, username, logger, rdv_server = PROTO_RDV_SERVER, key_filename = None, prompt = None):
         """ Constructor
         \param username The username to use with ssh to connect to the RDV server
         \param logger A logging.Logger to use for log messages
         \param key_filename A file containing the private key for key-based ssh authentication
         \param prompt The expected prompt (if None, will be built from the username) 
         """
-        self._rdv_server = TunnellingDev.PROTO_RDV_SERVER
+        self._rdv_server = rdv_server
         #self._ssh_connection = None
         self._ssh_username = username
         self._ssh_key_filename = key_filename
@@ -50,6 +52,12 @@ class TunnellingDev(object):
         self.ssh_escape_shell_supported = None  # This attribute will be set to True if an escape ssh shell is supported on our ssh client
         self.ssh_l_supported = None # This attributes describes whether remote port forwarding is supported on the ssh session (ssh -L option)
         self.ssh_remote_tcp_port = None # This attribute contains the remote TCP port on which vtun is accessible on the remote machine (we will tunnel this into the existing ssh session) 
+    
+    def get_rdv_server(self):
+        """ Get the RDV server tha this object is configured to connect to
+        \return A string containing the RDV server as a hostname or an IP address
+        """
+        return self._rdv_server
     
     def _get_ip_network(self, iface = 'eth0'):
         """ Get the IPv4 address of the specified interface
@@ -76,7 +84,41 @@ class TunnellingDev(object):
             return None
         
         return ipaddr.IPv4Network(str(ip) + '/' + str(netmask)) 
-    
+
+    def add_host_route(self, host_ip, iface):
+        """ Add a route to a specific host to the default routing table
+        \param host_ip The IP address of the host
+        \param iface The network interface on which to reach the host
+        """
+        host_ip = ipaddr.IPv4Address(host_ip)   # Convert to an IPv4Address object (this also check the validity of this IP address)
+        cmd = ['sudo', 'ip', 'route', 'list']
+        """
+        default via 10.10.16.3 dev eth0
+        10.10.16.0/21 dev eth0  proto kernel  scope link  src 10.10.16.68
+        10.64.64.64 dev ppp0  proto kernel  scope link  src 10.162.249.233
+        """
+        regexp1 = r'^.*[[:blank:]]+via[[:blank:]]+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)[[:blank:]].*dev[[:blank:]]+([^[:blank:]]+)[[:blank:]].*$'
+        regexp2 = r'^[[:blank:]]*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)[[:blank:]].*dev[[:blank:]]+([^[:blank:]]+)[[:blank:]].*$'
+        subproc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=open(os.devnull, 'wb'))
+        for line in subproc.stdout:
+            print('Got line "' + line + '"')
+            match = re.match(regexp1, line) # Try the via (gateway) route pattern
+            if match:
+                if match.group(2) == iface: # This is the entry for the interface we are interested on
+                    dest = match.group(1)
+                    print('Got dest="' + dest + '"')
+            else:
+                match = re.match(regexp2, line) # Trye the peer-to-peer (tunnel) route pattern
+                if match:
+                    if match.group(2) == iface: # This is the entry for the interface we are interested on
+                        dest = match.group(1)
+                        print('Got dest="' + dest + '"')
+        print('Doing nothing')
+        
+        # Run subprocess.check_call()
+        # Parse output
+        # Check rc value
+
     def catch_prompt(self, timeout = 2, exception_on_cmd_syntax_error = False):
         """ Wait for a remote prompt to appear
         

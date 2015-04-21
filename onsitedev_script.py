@@ -55,7 +55,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
     parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
     parser.add_argument('-t', '--session-time', type=int, dest='session_time', help='specify session duration (in seconds)', default=120)
-    parser.add_argument('-u', '--uplink_type', dest='uplink_type', help='uplink type (3G ou LAN)', default='LAN')
+    parser.add_argument('-u', '--3g-uplink-dev', type=str, dest='uplink_dev_3g', help='use a pre-established 3G link on device dev', default=None)
     args = parser.parse_args()
 
     # Setup logging
@@ -83,12 +83,14 @@ and automates the typing of tundev shell commands from the tunnelling devices si
 
     while True:
         tunnel_mode = onsite_dev.run_get_tunnel_mode()
-        if args.uplink_type == '3G':
-            onsite_dev.send_lan_ip_address_for_iface('ppp0')
+        onsite_dev.send_lan_ip_address_for_iface('eth0')
+        if args.uplink_dev_3g is None:
+            onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
         else:
-            onsite_dev.send_lan_ip_address_for_iface('eth0')
+            onsite_dev.add_host_route(onsite_dev.get_rdv_server(), args.uplink_dev_3g)
+            onsite_dev.run_set_tunnelling_dev_uplink_type('3g')
+            raise NotImplementedError('Lionel: WIP, do not use 3g mode please')
         
-        onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
         logger.info('Waiting for a master to request us to start our vtun tunnel to the RDV server')
         if onsite_dev.run_wait_master_connection():
             logger.info('RDV server allowed vtun tunnel')
