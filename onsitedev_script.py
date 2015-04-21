@@ -78,6 +78,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.propagate = False
     
     logger.debug(progname + ": Starting")
+    logger.info('Process pid is ' + str(os.getpid()))
     onsite_dev = OnsiteDev(username='rpi1100', logger=logger)
     
     if not args.uplink_dev_3g is None:  # We must add the specific route to the rdv server before we execute rdv_server_connect()
@@ -168,9 +169,9 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         signal.signal(signal.SIGINT, signalHandler)
         signal.signal(signal.SIGTERM, signalHandler)
         signal.signal(signal.SIGQUIT, signalHandler)
-        
         #We wait for the event in block mode and therefore the session will last 'forever' if neither ssh nor vtun client falls down 
-        event_down.wait()
+        while not event_down.is_set():
+            event_down.wait(1) #Wait without timeout can't be interrupted by unix signal so we wait the signal with a 1 second timeout and we do that until the even is set.
         #We disconnect signal from handler
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
