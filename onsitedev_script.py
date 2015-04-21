@@ -142,9 +142,30 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         print('Now sleeping ' + str(args.session_time/60) + ' min ' + str(args.session_time%60) + ' s')
         time.sleep(args.session_time)
     else:
-        print('Waiting until killed')
-        while True:
-            time.sleep(1)
+        print('Waiting until issue on vtund client or ssh session')
+        
+        #We prepare and event to be set when either ssh or vtun client falls down
+        event_down = Threading.Event()
+        event_down.clear()
+        
+        #Thread to run to wait a process to end and then set the event
+        class processWaiter(threading.Thread):
+            def __init__(self, process_to_wait):
+                self._process = process_to_wait
+            def run(self):
+                self._process.wait()
+                event_down.set()
+        
+        #Create 2 of those thread : one for ssh and one for vtun client
+        ssh_waiter = processWaiter(self.get_ssh_process())
+        vtun_client_waiter = processWaiter(vtun_client._vtun_process) #FIXME: Change python vtunlib in order to remove the direct access to 'private' attribute
+        
+        #Launch those threads
+        ssh_waiter.start()
+        vtun_client_waiter.start()
+        
+        #We wait for the event in block mode and therefore the session will last 'forever' if neither ssh nor vtun client falls down 
+        event_down.wait()
     
     print('...done')
     vtun_client.stop()

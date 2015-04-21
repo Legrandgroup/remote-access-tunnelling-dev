@@ -506,3 +506,8 @@ class TunnellingDev(object):
                                                     vtund_exec = vtund_exec,
                                                     vtund_use_sudo = vtund_use_sudo,
                                                     vtun_connection_timeout = vtun_connection_timeout)
+    def get_ssh_process(self):
+        if self._exp is None:
+            raise Exception('SSHSessionNotLaunched')
+        
+        return self._exp
