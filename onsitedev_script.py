@@ -17,6 +17,7 @@ import threading
 import signal
 
 progname = os.path.basename(sys.argv[0])
+pid_file_path = '/tmp/onsitedevscriptinstance.pid'
 
 class OnsiteDev(tundev_script.TunnellingDev):
     """ Script to connect to a RDV server from an onsite dev """
@@ -59,6 +60,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
     parser.add_argument('-t', '--session-time', type=int, dest='session_time', help='specify session duration (in seconds)', default=-1)
     parser.add_argument('-u', '--3g-uplink-dev', type=str, dest='uplink_dev_3g', help='use a pre-established 3G link on device dev', default=None)
+    parser.add_argument('-p', '--write-pid-file', dest='write_pid_file', action='store_true', help='write pid in file for daemonisation purpose', default=False)
 
     args = parser.parse_args()
 
@@ -79,6 +81,11 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     logger.debug(progname + ": Starting")
     logger.info('Process pid is ' + str(os.getpid()))
+    #Writing pid to pid_file_path
+    if args.write_pid_file:
+        pid_file = open(str(pid_file_path), 'w')
+        pid_file.write(str(os.getpid()))
+        pid_file.close()
     onsite_dev = OnsiteDev(username='rpi1100', logger=logger)
     
     if not args.uplink_dev_3g is None:  # We must add the specific route to the rdv server before we execute rdv_server_connect()
