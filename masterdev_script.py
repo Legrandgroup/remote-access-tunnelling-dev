@@ -13,6 +13,9 @@ import logging
 
 import time
 
+import threading
+import signal
+
 progname = os.path.basename(sys.argv[0])
 
 class MasterDev(tundev_script.TunnellingDev):
@@ -69,7 +72,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
     parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
     parser.add_argument('-m', '--tunnel-mode', dest='tunnel_mode', action='store_true', help='the OSI level for the tunnel (L2 or L3)', default='L3')
-    parser.add_argument('-t', '--session-time', type=int, dest='session_time', help='specify session duration (in seconds)', default=120)
+    parser.add_argument('-t', '--session-time', type=int, dest='session_time', help='specify session duration (in seconds)', default=-1)
     args = parser.parse_args()
 
     # Setup logging
@@ -88,6 +91,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.propagate = False
     
     logger.debug(progname + ": Starting")
+    logger.info('Process pid is ' + str(os.getpid()))
     master_dev = MasterDev(username='rpi1101', logger=logger)
     master_dev.rdv_server_connect(using_stunnel=args.with_stunnel)
     remote_onsite='rpi1100' # The remote onsite dev to which we want to connect
@@ -144,8 +148,49 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         print('Tunnel was not properly setup (no ping response from peer). Output from vtund client was:\n' + session_output, file=sys.stderr)
         raise Exception('TunnelNotWorking')
     logger.debug('Tunnel to RDV server is up (got a ping reply)')
-    print('Now sleeping ' + str(args.session_time/60) + ' min ' + str(args.session_time%60) + ' s')
-    time.sleep(args.session_time)
+    if args.session_time >= 0:
+        print('Now sleeping ' + str(args.session_time/60) + ' min ' + str(args.session_time%60) + ' s')
+        time.sleep(args.session_time)
+    else:
+        print('Waiting until issue on vtund client or ssh session')
+        
+        #We prepare and event to be set when either ssh or vtun client falls down
+        event_down = threading.Event()
+        event_down.clear()
+        
+        #To set the event if we catch SIGINT, SIGTERM or SIGQUIT
+        def signalHandler(signum, frame):
+            event_down.set()
+        
+        #Thread to run to wait a process to end and then set the event
+        class processWaiter(threading.Thread):
+            def __init__(self, process_to_wait):
+                super(processWaiter,self).__init__()
+                self.setDaemon(True)
+                self._process = process_to_wait
+            def run(self):
+                self._process.wait()
+                event_down.set()
+        
+        #Create 2 of those thread : one for ssh and one for vtun client
+        ssh_waiter = processWaiter(master_dev.get_ssh_process())
+        vtun_client_waiter = processWaiter(vtun_client._vtun_process) #FIXME: Change python vtunlib in order to remove the direct access to 'private' attribute
+        
+        #Launch those threads
+        ssh_waiter.start()
+        vtun_client_waiter.start()
+        
+        #We connect signal to handler
+        signal.signal(signal.SIGINT, signalHandler)
+        signal.signal(signal.SIGTERM, signalHandler)
+        signal.signal(signal.SIGQUIT, signalHandler)
+        #We wait for the event in block mode and therefore the session will last 'forever' if neither ssh nor vtun client falls down 
+        while not event_down.is_set():
+            event_down.wait(1) #Wait without timeout can't be interrupted by unix signal so we wait the signal with a 1 second timeout and we do that until the even is set.
+        #We disconnect signal from handler
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        signal.signal(signal.SIGQUIT, signal.SIG_DFL)
     print('...done')
     vtun_client.stop()
     session_output = vtun_client.get_output()
