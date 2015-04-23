@@ -62,8 +62,8 @@ class MasterDev(tundev_script.TunnellingDev):
         """ Run the command set_tunnel_mode on the remote tundev shell
         \param tunnel_mode The tunnel mode as a string (usual values 'L2' or 'L3')
         """
-        raise Exception('NotImplementedYet')
-        #self.run_command('set_tunnel_mode ' + str(tunnel_mode), 2)
+        #raise Exception('NotImplementedYet')
+        self.run_command('set_tunnel_mode ' + str(tunnel_mode), 2)
     
 if __name__ == '__main__':
     # Parse arguments
@@ -71,7 +71,7 @@ if __name__ == '__main__':
 and automates the typing of tundev shell commands from the tunnelling devices side in order to setup a tunnel session", prog=progname)
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
     parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
-    parser.add_argument('-m', '--tunnel-mode', dest='tunnel_mode', action='store_true', help='the OSI level for the tunnel (L2 or L3)', default='L3')
+    parser.add_argument('-m', '--tunnel-mode', dest='tunnel_mode', help='the OSI level for the tunnel (L2 or L3)', default='L3')
     parser.add_argument('-t', '--session-time', type=int, dest='session_time', help='specify session duration (in seconds)', default=-1)
     args = parser.parse_args()
 
@@ -108,7 +108,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         time.sleep(10)
     
     master_dev.send_lan_ip_address_for_iface('eth0')
-    #master_dev.run_set_tunnel_mode(args.tunnel_mode)
+    master_dev.run_set_tunnel_mode(args.tunnel_mode)
     #master_dev.run_set_tunnelling_dev_uplink_type('lan')
     logger.info('Selecting onsite dev ' + remote_onsite + ' for this session')
     master_dev.run_connect_to_onsite_dev(remote_onsite) # Now connect to this remote
