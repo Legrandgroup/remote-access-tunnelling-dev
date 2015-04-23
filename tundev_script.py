@@ -483,11 +483,13 @@ class TunnellingDev(object):
                                                            mode=self.tunnel_mode,
                                                            vtun_connection_timeout=self.vtun_connection_timeout
                                                            )
-                for command in str(self.config_dict['up_additional_commands']).split(';'):
-                    client_vtun_tunnel_object.add_up_command(command)
+                if str(self.config_dict['up_additional_commands']):
+                    for command in str(self.config_dict['up_additional_commands']).split(';'):
+                        client_vtun_tunnel_object.add_up_command(command)
                 
-                for command in str(self.config_dict['down_additional_commands']).split(';'):
-                    client_vtun_tunnel_object.add_down_command(command)
+                if str(self.config_dict['down_additional_commands']):
+                    for command in str(self.config_dict['down_additional_commands']).split(';'):
+                        client_vtun_tunnel_object.add_down_command(command)
                 
                 return client_vtun_tunnel_object
             except KeyError:
