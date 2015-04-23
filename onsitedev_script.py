@@ -112,6 +112,9 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         else:
             logger.warning('RDV server asked us to restart by sending us a wait_master_connection reply containing "reset"')
     
+    #Updating tunnel mode according to masterdev tunnel mode
+    tunnel_mode = onsite_dev.run_get_tunnel_mode()
+    
     locally_redirected_vtun_server_port = 5000
     vtun_client_config = onsite_dev.get_client_vtun_tunnel(tunnel_mode,
                                                            vtun_server_hostname='127.0.0.1',
