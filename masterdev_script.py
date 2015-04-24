@@ -158,23 +158,35 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         event_down = threading.Event()
         event_down.clear()
         
+        #We prepare 3 events to be set in order to have a better idea of what failed
+        event_ssh_down = threading.Event()
+        event_ssh_down.clear()
+        event_vtun_down = threading.Event()
+        event_vtun_down.clear()
+        event_signal_received = threading.Event()
+        event_signal_received.clear()
+        
         #To set the event if we catch SIGINT, SIGTERM or SIGQUIT
         def signalHandler(signum, frame):
+            logger.info('Handled signal ' + str(signum))
+            event_signal_received.set()
             event_down.set()
         
         #Thread to run to wait a process to end and then set the event
         class processWaiter(threading.Thread):
-            def __init__(self, process_to_wait):
+            def __init__(self, process_to_wait, event_to_set_for_logging):
                 super(processWaiter,self).__init__()
                 self.setDaemon(True)
                 self._process = process_to_wait
+                self.log_event = event_to_set_for_logging
             def run(self):
                 self._process.wait()
+                self.log_event.set()
                 event_down.set()
         
         #Create 2 of those thread : one for ssh and one for vtun client
-        ssh_waiter = processWaiter(master_dev.get_ssh_process())
-        vtun_client_waiter = processWaiter(vtun_client._vtun_process) #FIXME: Change python vtunlib in order to remove the direct access to 'private' attribute
+        ssh_waiter = processWaiter(onsite_dev.get_ssh_process(), event_ssh_down)
+        vtun_client_waiter = processWaiter(vtun_client.get_vtun_process(), event_vtun_down) #FIXME: Change python vtunlib in order to remove the direct access to 'private' attribute
         
         #Launch those threads
         ssh_waiter.start()
@@ -191,6 +203,13 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
         signal.signal(signal.SIGQUIT, signal.SIG_DFL)
+        
+        if event_signal_received.is_set():
+            logger.info('Stopped by receiving signal')
+        if event_ssh_down.is_set():
+            logger.error('Stopped by losing SSH Connection')
+        if event_vtun_down.is_set():
+            logger.error('Stopped by losing Vtun Tunnel')
     print('...done')
     vtun_client.stop()
     session_output = vtun_client.get_output()
