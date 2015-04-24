@@ -149,27 +149,39 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     else:
         print('Waiting until issue on vtund client or ssh session')
         
-        #We prepare and event to be set when either ssh or vtun client falls down
+        #We prepare an event to be set when either ssh or vtun client falls down
         event_down = threading.Event()
         event_down.clear()
         
+        #We prepare 3 events to be set in order to have a better idea of what failed
+        event_ssh_down = threading.Event()
+        event_ssh_down.clear()
+        event_vtun_down = threading.Event()
+        event_vtun_down.clear()
+        event_signal_received = threading.Event()
+        event_signal_received.clear()
+                                    
         #To set the event if we catch SIGINT, SIGTERM or SIGQUIT
         def signalHandler(signum, frame):
+            logger.info('Handled signal ' + str(signum))
+            event_signal_received.set()
             event_down.set()
         
         #Thread to run to wait a process to end and then set the event
         class processWaiter(threading.Thread):
-            def __init__(self, process_to_wait):
+            def __init__(self, process_to_wait, event_to_set_for_logging):
                 super(processWaiter,self).__init__()
                 self.setDaemon(True)
                 self._process = process_to_wait
+                self.log_event = event_to_set_for_logging
             def run(self):
                 self._process.wait()
+                self.log_event.set()
                 event_down.set()
         
         #Create 2 of those thread : one for ssh and one for vtun client
-        ssh_waiter = processWaiter(onsite_dev.get_ssh_process())
-        vtun_client_waiter = processWaiter(vtun_client._vtun_process) #FIXME: Change python vtunlib in order to remove the direct access to 'private' attribute
+        ssh_waiter = processWaiter(onsite_dev.get_ssh_process(), event_ssh_down)
+        vtun_client_waiter = processWaiter(vtun_client.get_vtun_process(), event_vtun_down) #FIXME: Change python vtunlib in order to remove the direct access to 'private' attribute
         
         #Launch those threads
         ssh_waiter.start()
@@ -181,13 +193,22 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         signal.signal(signal.SIGQUIT, signalHandler)
         #We wait for the event in block mode and therefore the session will last 'forever' if neither ssh nor vtun client falls down 
         while not event_down.is_set():
-            event_down.wait(1) #Wait without timeout can't be interrupted by unix signal (cf http://stackoverflow.com/questions/3102163/why-does-using-threading-event-result-in-sigterm-not-being-caught) so we wait the signal with a 1 second timeout and we do that until the even is set.
+            #onsite_dev.run_command('echo .')
+            event_down.wait(1) #Wait without timeout can't be interrupted by unix signal so we wait the signal with a 1 second timeout and we do that until the even is set.
         #We disconnect signal from handler
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
         signal.signal(signal.SIGQUIT, signal.SIG_DFL)
+        
+        if event_signal_received.is_set():
+            logger.info('Stopped by receiving signal')
+        if event_ssh_down.is_set():
+            logger.error('Stopped by losing SSH Connection')
+        if event_vtun_down.is_set():
+            logger.error('Stopped by losing Vtun Tunnel')
     
     print('...done')
+    
     vtun_client.stop()
     session_output = vtun_client.get_output()
     session_output = '|' + session_output.replace('\n', '\n|')  # Prefix the whole output with a | character so that dump is easily spotted
