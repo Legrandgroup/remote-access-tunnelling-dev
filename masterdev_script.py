@@ -185,7 +185,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
                 event_down.set()
         
         #Create 2 of those thread : one for ssh and one for vtun client
-        ssh_waiter = processWaiter(onsite_dev.get_ssh_process(), event_ssh_down)
+        ssh_waiter = processWaiter(master_dev.get_ssh_process(), event_ssh_down)
         vtun_client_waiter = processWaiter(vtun_client.get_vtun_process(), event_vtun_down) #FIXME: Change python vtunlib in order to remove the direct access to 'private' attribute
         
         #Launch those threads
