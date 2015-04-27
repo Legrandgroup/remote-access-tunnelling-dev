@@ -135,19 +135,20 @@ and automates the typing of tundev shell commands from the tunnelling devices si
      
     vtun_client.start()
     logger.debug('Started local vtun client as PID ' + str(vtun_client._vtun_pid))
-    try:
-        vtun_client_config.check_ping_peer()
-    except:
-        logger.error('Peer does not respond to pings inside the tunnel')
-        session_output = vtun_client.get_output()
-        session_output = '|' + session_output.replace('\n', '\n|')  # Prefix the whole output with a | character so that dump is easily spotted
-        if session_output.endswith('|'):    # Remove the last line that only contains a | character
-            session_output = session_output[:-1]
-        while session_output.endswith('|\n'):   # Get rid of the last empty line(s) that is/are present most of the time
-            session_output = session_output[:-2]
-        print('Tunnel was not properly setup (no ping response from peer). Output from vtund client was:\n' + session_output, file=sys.stderr)
-        raise Exception('TunnelNotWorking')
-    logger.debug('Tunnel to RDV server is up (got a ping reply)')
+    if tunnel_mode == 'L3':
+        try:
+            vtun_client_config.check_ping_peer()
+        except:
+            logger.error('Peer does not respond to pings inside the tunnel')
+            session_output = vtun_client.get_output()
+            session_output = '|' + session_output.replace('\n', '\n|')  # Prefix the whole output with a | character so that dump is easily spotted
+            if session_output.endswith('|'):    # Remove the last line that only contains a | character
+                session_output = session_output[:-1]
+            while session_output.endswith('|\n'):   # Get rid of the last empty line(s) that is/are present most of the time
+                session_output = session_output[:-2]
+            print('Tunnel was not properly setup (no ping response from peer). Output from vtund client was:\n' + session_output, file=sys.stderr)
+            raise Exception('TunnelNotWorking')
+        logger.debug('Tunnel to RDV server is up (got a ping reply)')
     if args.session_time >= 0:
         print('Now sleeping ' + str(args.session_time/60) + ' min ' + str(args.session_time%60) + ' s')
         time.sleep(args.session_time)
