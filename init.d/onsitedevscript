@@ -1,4 +1,18 @@
 #! /bin/sh -e
+# Start/stop the onsite to RDV connection script.
+#
+### BEGIN INIT INFO
+# Provides:          onsitedevscript 
+# Required-Start:    $network $stunnel
+# Required-Stop:     $network $stunnel
+# Default-Start:     2
+# Default-Stop:
+# Short-Description: Automatic startup for onsite to RDV connection. 
+# Description:       Automatically starts a connection to the RDV server
+#                    as an onsite device, and persist in doing so (if
+#                    connection is broken, it will re-try setting it up
+#                    as long as this service is running)
+### END INIT INFO
 
 DAEMON="/home/pi/tunnelling-dev-scripts/onsitedev_script.sh" #ligne de commande du programme
 daemon_OPT=""  #argument à utiliser par le programme
