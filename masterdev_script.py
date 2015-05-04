@@ -73,12 +73,19 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
     parser.add_argument('-m', '--tunnel-mode', dest='tunnel_mode', help='the OSI level for the tunnel (L2 or L3)', default='L3')
     parser.add_argument('-t', '--session-time', type=int, dest='session_time', help='specify session duration (in seconds)', default=-1)
+    parser.add_argument('-o', '--onsite', type=str, action='store', help='ID of the onsite device to connect to', default=None)
     args = parser.parse_args()
 
     # Setup logging
     logging.basicConfig()
     
-    logger = logging.getLogger(__name__)
+    if args.onsite is None:
+        print(progname + ': Error: --onsite argument is mandatory', file=sys.stderr)
+        exit(1)
+    else:
+        remote_onsite=args.onsite # The remote onsite dev to which we want to connect
+    
+    logger = logging.getLogger(progname)
     
     if args.debug:
         logger.setLevel(logging.DEBUG)
@@ -86,15 +93,14 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         logger.setLevel(logging.INFO)
     
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s():%(lineno)d %(message)s"))
+    handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s:%(lineno)d %(message)s"))
     logger.addHandler(handler)
     logger.propagate = False
     
-    logger.debug(progname + ": Starting")
-    logger.info('Process pid is ' + str(os.getpid()))
+    logger.debug('Starting as PID ' + str(os.getpid()))
     master_dev = MasterDev(username='rpi1101', logger=logger)
     master_dev.rdv_server_connect(using_stunnel=args.with_stunnel)
-    remote_onsite='rpi1100' # The remote onsite dev to which we want to connect
+    logger.info('Connecting to onsite ' + remote_onsite)
     unavail_onsite_msg = 'Could not connect to ' + remote_onsite + '. It is not connected (yet). Waiting'
     while True:
         onsite_dev_list = master_dev.get_online_onsite_dev()

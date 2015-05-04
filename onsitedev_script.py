@@ -67,7 +67,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     # Setup logging
     logging.basicConfig()
     
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger(progname)
     
     if args.debug:
         logger.setLevel(logging.DEBUG)
@@ -75,12 +75,12 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         logger.setLevel(logging.INFO)
     
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s():%(lineno)d %(message)s"))
+    handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s:%(lineno)d %(message)s"))
     logger.addHandler(handler)
     logger.propagate = False
     
-    logger.debug(progname + ": Starting")
-    logger.info('Process pid is ' + str(os.getpid()))
+    logger.debug('Starting as PID ' + str(os.getpid()))
+    
     #Writing pid to pid_file_path
     if args.write_pid_file:
         pid_file = open(str(pid_file_path), 'w')
