@@ -17,6 +17,24 @@ RTM_NEWLINK=0x10
 RTM_DELLINK=0x11
 IFLA_IFNAME=0x3
 IFF_UP=0x1
+IFF_BROADCAST=0x2
+IFF_DEBUG=0x4
+IFF_LOOPBACK=0x8
+IFF_POINTOPOINT=0x10
+IFF_RUNNING=0x40
+IFF_NOARP=0x80
+IFF_PROMISC=0x100
+IFF_NOTRAILERS=0x20
+IFF_ALLMULTI=0x200
+IFF_MASTER=0x400
+IFF_SLAVE=0x800
+IFF_MULTICAST=0x1000
+IFF_PORTSEL=0x2000
+IFF_AUTOMEDIA=0x4000
+IFF_DYNAMIC=0x8000
+IFF_LOWER_UP=0x10000
+IFF_DORMANT=0x20000
+IFF_ECHO=0x40000
 
 #In order to adapt these values to your platform, you will have to compile and run the following C code, and paste the result into the section above
 """
@@ -35,6 +53,24 @@ int main (int arvc, char *argv[]) {
 	printf("RTM_DELLINK=0x%x\n", RTM_DELLINK);
 	printf("IFLA_IFNAME=0x%x\n", IFLA_IFNAME);
 	printf("IFF_UP=0x%x\n", IFF_UP);
+	printf("IFF_BROADCAST=0x%x\n", IFF_BROADCAST);
+	printf("IFF_DEBUG=0x%x\n", IFF_DEBUG);
+	printf("IFF_LOOPBACK=0x%x\n", IFF_LOOPBACK);
+	printf("IFF_POINTOPOINT=0x%x\n", IFF_POINTOPOINT);
+	printf("IFF_RUNNING=0x%x\n", IFF_RUNNING);
+	printf("IFF_NOARP=0x%x\n", IFF_NOARP);
+	printf("IFF_PROMISC=0x%x\n", IFF_PROMISC);
+	printf("IFF_NOTRAILERS=0x%x\n", IFF_NOTRAILERS);
+	printf("IFF_ALLMULTI=0x%x\n", IFF_ALLMULTI);
+	printf("IFF_MASTER=0x%x\n", IFF_MASTER);
+	printf("IFF_SLAVE=0x%x\n", IFF_SLAVE);
+	printf("IFF_MULTICAST=0x%x\n", IFF_MULTICAST);
+	printf("IFF_PORTSEL=0x%x\n", IFF_PORTSEL);
+	printf("IFF_AUTOMEDIA=0x%x\n", IFF_AUTOMEDIA);
+	printf("IFF_DYNAMIC=0x%x\n", IFF_DYNAMIC);
+	printf("IFF_LOWER_UP=0x%x\n", IFF_LOWER_UP);
+	printf("IFF_DORMANT=0x%x\n", IFF_DORMANT);
+	printf("IFF_ECHO=0x%x\n", IFF_ECHO);
 	return 0;
 }
 """
@@ -74,7 +110,7 @@ def get_next_netlink_event(socket):
         
         # We fundamentally only care about NEWLINK messages in this version.
         if msg_type != RTM_NEWLINK and msg_type != RTM_DELLINK:
-            return (msg_type, '')
+            return (msg_type, None, None)
         
         ifinfomsg = data[:16]
         rtattr_list = data[16:]    # Skip the ifinfomsg (16 bytes) that we have processed
@@ -106,19 +142,22 @@ def get_next_netlink_event(socket):
             
             if rta_type == IFLA_IFNAME: # We are getting to the interface name part of the netlink message... this is what we are looking for
                 rta_data = rta_data.rstrip('\x00')  # Interface name strings are usually NULL terminated
-                return (msg_type, rta_data)
+                l1_link = (flags & IFF_LOWER_UP) != 0
+                return (msg_type, l1_link, rta_data)
 
 # Create the netlink socket and bind to RTMGRP_LINK,
 s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
 s.bind((os.getpid(), RTMGRP_LINK))
 
 while True:
-    (status, ifname) = get_next_netlink_event(socket=s)
-    print('ifname="' + ifname + '"')
-    if is_secondary_usb_if(ifname):
-        if status == RTM_NEWLINK:
-            print('New info on enabled interface ' + str(ifname))
-        elif status == RTM_DELLINK:
-            print('Disabled interface ' + str(ifname))
-        else:
-            print('Unknown message')
+    (if_event, link_status, ifname) = get_next_netlink_event(socket=s)
+    if if_event == RTM_NEWLINK:
+        if is_secondary_usb_if(ifname):
+            if link_status:
+                print('Interface ' + str(ifname) + ' exists and has link UP')
+            else:
+                print('Interface ' + str(ifname) + ' exists and has link DOWN')
+    elif if_event == RTM_DELLINK:
+        print('Interface ' + str(ifname) + ' has disappeared')
+    else:
+        print('Unknown message')
