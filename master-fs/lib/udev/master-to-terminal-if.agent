@@ -13,14 +13,14 @@ fi
 DHCP_SERVER_PID_FILE=/var/run/master-if-dnsmasq.pid
 
 enable_terminal_if() {
-    sudo ifconfig "$INTERFACE" 192.168.38.225 netmask 255.255.255.240
-    sudo dnsmasq -d -i "$INTERFACE" -u dnsmasq --dhcp-range=interface:eth1,192.168.38.226,192.168.38.238,30 --port=0 --dhcp-authoritative --log-dhcp -x "$DHCP_SERVER_PID_FILE"
+    ifconfig "$INTERFACE" 192.168.38.225 netmask 255.255.255.240
+    dnsmasq -i "$INTERFACE" -u dnsmasq --dhcp-range=interface:eth1,192.168.38.226,192.168.38.238,30 --port=0 --dhcp-authoritative --log-dhcp -x "$DHCP_SERVER_PID_FILE"
 }
 
 disable_terminal_if() {
     kill $(cat $DHCP_SERVER_PID_FILE)
     rm -f $DHCP_SERVER_PID_FILE
-    sudo ifconfig "$INTERFACE" 0.0.0.0 2>/dev/null || :
+    ifconfig "$INTERFACE" 0.0.0.0 2>/dev/null || :
 }
 
 terminal_if_daemon () {
