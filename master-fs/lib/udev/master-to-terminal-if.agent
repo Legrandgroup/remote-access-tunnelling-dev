@@ -1,0 +1,59 @@
+#!/bin/sh
+# udev agent script
+
+HOTPLUGFUNCS=/lib/udev/hotplug.functions
+[ -f $HOTPLUGFUNCS ] || exit 1
+. $HOTPLUGFUNCS
+
+if [ -z "$INTERFACE" ]; then
+    mesg Bad invocation: \$INTERFACE is not set
+    exit 1
+fi
+
+DHCP_SERVER_PID_FILE=/var/run/master-if-dnsmasq.pid
+
+enable_terminal_if() {
+    sudo ifconfig "$INTERFACE" 192.168.38.225 netmask 255.255.255.240
+    sudo dnsmasq -d -i "$INTERFACE" -u dnsmasq --dhcp-range=interface:eth1,192.168.38.226,192.168.38.238,30 --port=0 --dhcp-authoritative --log-dhcp -x "$DHCP_SERVER_PID_FILE"
+}
+
+disable_terminal_if() {
+    kill $(cat $DHCP_SERVER_PID_FILE)
+    rm -f $DHCP_SERVER_PID_FILE
+    sudo ifconfig "$INTERFACE" 0.0.0.0 2>/dev/null || :
+}
+
+terminal_if_daemon () {
+    if test x"$INTERFACE" = x"eth0"; then
+        debug_mesg "Ignoring blacklisted main interface eth0"
+        return
+    fi
+    if ! test -e "/sys/class/net/$INTERFACE"; then
+        debug_mesg "Error: Interface $INTERFACE not found in /sys/class/net/"
+        return
+    fi
+    if test -e "/sys/class/net/$INTERFACE/wireless"; then
+        debug_mesg "Info: Discarding wireless interface $INTERFACE"
+        return
+    fi
+    if test -L "/sys/class/net/$INTERFACE/device/subsystem"; then
+        link_target=$(readlink "/sys/class/net/$INTERFACE/device/subsystem")
+        if echo "$link_target" | grep -q '/bus/usb$'; then
+            logger "Info: Interface $INTERFACE is our secondary interface"
+            case "$ACTION" in
+            add|register)
+                # wait for loopback interface to exist, we may have
+                # been invoked very early in boot sequence
+                wait_for_interface lo
+
+                enable_terminal_if
+                ;;
+            remove|unregister)
+                disable_terminal if
+                ;;
+            esac
+        fi
+    fi
+}
+
+terminal_if_daemon &
