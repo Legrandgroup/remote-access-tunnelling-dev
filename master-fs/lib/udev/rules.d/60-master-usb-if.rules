@@ -1,0 +1,1 @@
+SUBSYSTEM=="net", RUN+="master-to-terminal-if.agent"
