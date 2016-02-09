@@ -93,6 +93,12 @@ def is_secondary_usb_if(ifname):
     
     return False
 
+"""
+\brief Waits until there is a new netlink event from the kernel and parse it
+\param socket The socket.AF_NETLINK socket (in socket.SOCK_RAW mode, with socket.NETLINK_ROUTE filtering)
+\return A tuple of 3 items: the first item is the message type (RTM_NEWLINK or RTM_DELLINK), the second is a boolean indicating if the physical carrier is up (or None if N/A), the third is the interface name as a string
+\note This function may raise exception if NLMSG_ERROR is received
+"""
 def get_next_netlink_event(socket):
     
     while True:
