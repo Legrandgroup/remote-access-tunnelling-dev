@@ -8,6 +8,11 @@ import os
 import socket
 import struct
 
+import argparse
+
+import logging
+import logging.handlers
+
 # These constants map to constants in the Linux kernel. These should be set according to the target...
 RTMGRP_LINK=0x1
 NLMSG_NOOP=0x1
@@ -151,19 +156,73 @@ def get_next_netlink_event(socket):
                 l1_link = (flags & IFF_LOWER_UP) != 0
                 return (msg_type, l1_link, rta_data)
 
-# Create the netlink socket and bind to RTMGRP_LINK,
-s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
-s.bind((os.getpid(), RTMGRP_LINK))
+def process_secondary_if_events(on_link_up_callback, on_link_down_callback, on_destroy_callback):
+    # Create the netlink socket and bind to RTMGRP_LINK,
+    s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
+    s.bind((os.getpid(), RTMGRP_LINK))
 
-while True:
-    (if_event, link_status, ifname) = get_next_netlink_event(socket=s)
-    if if_event == RTM_NEWLINK:
-        if is_secondary_usb_if(ifname):
-            if link_status:
-                print('Interface ' + str(ifname) + ' exists and has link UP')
-            else:
-                print('Interface ' + str(ifname) + ' exists and has link DOWN')
-    elif if_event == RTM_DELLINK:
-        print('Interface ' + str(ifname) + ' has disappeared')
-    else:
-        print('Unknown message')
+    while True:
+        (if_event, link_status, ifname) = get_next_netlink_event(socket=s)
+        if if_event == RTM_NEWLINK:
+            if is_secondary_usb_if(ifname):
+                if link_status:
+                    if on_link_up_callback is not None:
+                        on_link_up_callback(str(ifname))
+                else:
+                    if on_link_down_callback is not None:
+                        on_link_down_callback(str(ifname))
+        elif if_event == RTM_DELLINK:
+            if on_destroy_callback is not None:
+                on_destroy_callback(str(ifname))
+        #~ else:
+            #~ logger.warning('Unknown message')
+
+class InterfaceHandler:
+    def __init__(self, ifname):
+        self.ifname = ifname
+        print('New interface ' + self.ifname)
+        
+    def set_link_up(self):
+        print('Link is up for ' + self.ifname)
+        
+    def set_link_down(self):
+        print('Link is down for ' + self.ifname)
+        
+    def destroy(self):
+            print('Interface ' + self.ifname + ' is being destroyed')
+
+class InterfacesWatcher:
+    def __init__(self):
+        self._secondary_if_dict = {}
+        
+    def if_link_up(self, ifname):
+        if_handler = None
+        try:
+            if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
+        except KeyError:
+            print('Creating handler for interface ' + ifname)
+            self._secondary_if_dict[ifname] = InterfaceHandler(ifname)
+            if_handler = self._secondary_if_dict[ifname]
+        if_handler.set_link_up()
+        
+    def if_link_down(self, ifname):
+        if_handler = None
+        try:
+            if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
+        except KeyError:
+            print('Creating handler for interface ' + ifname)
+            self._secondary_if_dict[ifname] = InterfaceHandler(ifname)
+            if_handler = self._secondary_if_dict[ifname]
+        if_handler.set_link_down()
+    
+    def if_destroyed(self, ifname):
+        try:
+            if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
+            if_handler.destroy()
+            del self._secondary_if_dict[ifname]
+        except KeyError:
+            pass
+
+if __name__ == '__main__':
+    ifW = InterfacesWatcher()
+    process_secondary_if_events(ifW.if_link_up, ifW.if_link_down, ifW.if_destroyed) # Run main loop
