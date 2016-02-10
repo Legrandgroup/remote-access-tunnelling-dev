@@ -11,6 +11,8 @@ import struct
 
 import argparse
 
+import re
+
 import logging
 import logging.handlers
 
@@ -185,9 +187,22 @@ def process_secondary_if_events(on_link_up_callback, on_link_down_callback, on_d
             #~ logger.warning('Unknown message')
 
 class DhcpService:
-    def __init__(self):
-        self.ip_addr = '192.168.38.225'
-        self.ip_netmask = '255.255.255.240'
+    def __init__(self, ip_addr, ip_prefix, range_size = None):
+        prefix_bitmask = ((1 << (32 - ip_prefix)) - 1) ^ 0xffffffff
+        ip_netmask = str((prefix_bitmask >> 24) & 0xff)
+        ip_netmask += '.'
+        ip_netmask += str((prefix_bitmask >> 16) & 0xff)
+        ip_netmask += '.'
+        ip_netmask += str((prefix_bitmask >> 8) & 0xff)
+        ip_netmask += '.'
+        ip_netmask += str((prefix_bitmask) & 0xff)
+        self.ip_addr = ip_addr
+        self.ip_netmask = ip_netmask
+        if range_size is None:
+            self.dhcp_range_start = None
+            self.dhcp_range_end = None
+        else:
+            base_network_32bit = ip_addr
         self.dhcp_range_start = '192.168.38.226'
         self.dhcp_range_end ='192.168.38.238'
         
@@ -240,7 +255,9 @@ class InterfaceHandler:
         self.set_link_down()
 
 class InterfacesWatcher:
-    def __init__(self):
+    def __init__(self, ip_addr, ip_prefix):
+        self.ip_addr = ip_addr
+        self.ip_prefix = ip_prefix
         self._secondary_if_dict = {}
         self._ip_subnet_allocated = None
         
@@ -276,7 +293,7 @@ class InterfacesWatcher:
         if self._ip_subnet_allocated:
             raise Exception('DualSecondarySubnetNotSupported')
         else:
-            self._ip_subnet_allocated = DhcpService()
+            self._ip_subnet_allocated = DhcpService(ip_addr=ip_addr, ip_prefix=ip_prefix)
             return self._ip_subnet_allocated
 
     def release_ip_subnet(self, ip_subnet):
@@ -286,20 +303,41 @@ class InterfacesWatcher:
             self._ip_subnet_allocated = None
 
 if __name__ == '__main__':
+    # Parse arguments
+
+    parser = argparse.ArgumentParser(description="This program watches all network interfaces for removable USB to Ethernet adapters. \
+When it finds one, it automatically sets it up and distributres IP addresses on this interface.", prog=progname)
+    parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
+    parser.add_argument('-I', '--ip-addr', dest='ip_addr', type=str, help='Use the specified IP address and prefix for the USB interface in the CIDR notation', default='192.168.38.225/28')
+    parser.add_argument('-S', '--dhcp-range-size', type=int, dest='dhcp_range_size', help='the size of the DHCP range to distribute', default=10)
+    
+    args = parser.parse_args()
+    
+    # Setup logging
     logging.basicConfig()
     logger = logging.getLogger(progname)
 
-    #~ if args.debug:
-        #~ logger.setLevel(logging.DEBUG)
-    #~ else:
-        #~ logger.setLevel(logging.INFO)
-
-    logger.setLevel(logging.DEBUG)
-
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+    
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s:%(lineno)d %(message)s"))
     logger.addHandler(handler)
     logger.propagate = False
-
-    ifW = InterfacesWatcher()
+    
+    ip_addr = None
+    ip_netmask = None
+    match = re.match(r'^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/([0-9]+)$', args.ip_addr)
+    if match:
+        ip_addr = match.group(1)
+        ip_prefix = int(match.group(2))
+        if ip_prefix<8 or ip_prefix>30:
+            raise Exeption('InvalidPrefix:' + ip_prefix)
+    else:
+        logger.error('Invalid IP address or netmask: ' + args.ip_addr)
+        raise Exception('InvalidIPParams')
+    
+    ifW = InterfacesWatcher(ip_addr, ip_prefix)
     process_secondary_if_events(ifW.if_link_up, ifW.if_link_down, ifW.if_destroyed) # Run main loop
