@@ -181,12 +181,12 @@ and automates the typing of tundev shell commands from the tunnelling devices si
                 session_output = session_output[:-2]
             print('Tunnel was not properly setup (no ping response from peer). Output from vtund client was:\n' + session_output, file=sys.stderr)
             raise Exception('TunnelNotWorking')
-        logger.debug('Tunnel to RDV server is up (got a ping reply)')
+        logger.info('Tunnel to RDV server is up (got a ping reply)')
     if args.session_time >= 0:
         print('Now sleeping ' + str(args.session_time/60) + ' min ' + str(args.session_time%60) + ' s')
         time.sleep(args.session_time)
     else:
-        print('Waiting until issue on vtund client or ssh session')
+        print('vtund over ssh session now established')
         
         #We prepare and event to be set when either ssh or vtun client falls down
         event_down = threading.Event()
