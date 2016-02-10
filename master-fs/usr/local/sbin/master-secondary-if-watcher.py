@@ -9,6 +9,8 @@ import sys
 import socket
 import struct
 
+import ipaddr
+
 import argparse
 
 import re
@@ -187,24 +189,17 @@ def process_secondary_if_events(on_link_up_callback, on_link_down_callback, on_d
             #~ logger.warning('Unknown message')
 
 class DhcpService:
-    def __init__(self, ip_addr, ip_prefix, range_size = None):
-        prefix_bitmask = ((1 << (32 - ip_prefix)) - 1) ^ 0xffffffff
-        ip_netmask = str((prefix_bitmask >> 24) & 0xff)
-        ip_netmask += '.'
-        ip_netmask += str((prefix_bitmask >> 16) & 0xff)
-        ip_netmask += '.'
-        ip_netmask += str((prefix_bitmask >> 8) & 0xff)
-        ip_netmask += '.'
-        ip_netmask += str((prefix_bitmask) & 0xff)
-        self.ip_addr = ip_addr
-        self.ip_netmask = ip_netmask
-        if range_size is None:
-            self.dhcp_range_start = None
-            self.dhcp_range_end = None
+    def __init__(self, ip_addr, ip_prefix):
+        self.ip_network = ipaddr.IPNetwork(str(ip_addr) + '/' + str(ip_prefix))
+        if logger: logger.debug('Using secondary IP range ' + str(self.ip_network))
+        self.ip_addr = self.ip_network.ip
+        self.ip_netmask = self.ip_network.netmask
+        self.dhcp_range_start = self.ip_addr + 1
+        self.dhcp_range_end = self.ip_network.broadcast - 1
+        if self.dhcp_range_start < self.dhcp_range_end: # Not enough IP addresses in range... raise an exception
+            self.dhcp_range_size = int(self.dhcp_range_end) - int(self.dhcp_range_start) + 1    # Boundaries are included (start accounts for 1 more)
         else:
-            base_network_32bit = ip_addr
-        self.dhcp_range_start = '192.168.38.226'
-        self.dhcp_range_end ='192.168.38.238'
+            raise Exception('InvalidDHCPRange')
         
 class InterfaceHandler:
     def __init__(self, ifname, watcher):
@@ -214,6 +209,7 @@ class InterfaceHandler:
         self.dnsmasq_pid_file = '/var/run/secondary-if-dnsmasq.' + ifname + '.pid'
         self.dnsmasq_proc = None
         self.dhcp_subnet = None
+        if logger: logger.debug('Discovered new interface ' + ifname)
         
     def set_link_up(self):
         if not self.link:
@@ -224,11 +220,10 @@ class InterfaceHandler:
                 if logger: logger.debug('Using IP address ' + str(self.dhcp_subnet.ip_addr) + ' on interface ' + self.ifname)
                 cmd = ['ifconfig', self.ifname, str(self.dhcp_subnet.ip_addr), 'netmask', str(self.dhcp_subnet.ip_netmask)]
                 subprocess.check_call(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-                if logger: logger.debug('Distributing range ' + str(self.dhcp_subnet.dhcp_range_start) + '-' + str(self.dhcp_subnet.dhcp_range_end) + ' on interface ' + self.ifname)
+                if logger: logger.debug('Distributing range ' + str(self.dhcp_subnet.dhcp_range_start) + '-' + str(self.dhcp_subnet.dhcp_range_end) + ' (' + str(self.dhcp_subnet.dhcp_range_size) + ' IP addresses) on interface ' + self.ifname)
                 cmd = ['dnsmasq', '-i', self.ifname, '-u', 'dnsmasq', '-k', '--leasefile-ro', '--dhcp-range=interface:' + self.ifname + ',' + str(self.dhcp_subnet.dhcp_range_start) + ',' + str(self.dhcp_subnet.dhcp_range_end) + ',30', '--port=0', '--dhcp-authoritative', '--log-dhcp', '-x', self.dnsmasq_pid_file]
                 self.dnsmasq_proc = subprocess.Popen(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-            except:
-                if logger: logger.error('Could not get a subnet to distribute')
+            except DhcpRangeAllocationError:
                 raise
         
     def set_link_down(self):
@@ -253,6 +248,9 @@ class InterfaceHandler:
     def destroy(self):
         if logger: logger.debug('Interface ' + self.ifname + ' is being destroyed... performing cleanup')
         self.set_link_down()
+
+class DhcpRangeAllocationError(Exception):
+    pass
 
 class InterfacesWatcher:
     def __init__(self, ip_addr, ip_prefix):
@@ -291,7 +289,7 @@ class InterfacesWatcher:
             
     def allocate_ip_subnet(self):
         if self._ip_subnet_allocated:
-            raise Exception('DualSecondarySubnetNotSupported')
+            raise DhcpRangeAllocationError('DualSecondarySubnetNotSupported')
         else:
             self._ip_subnet_allocated = DhcpService(ip_addr=ip_addr, ip_prefix=ip_prefix)
             return self._ip_subnet_allocated
@@ -308,8 +306,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="This program watches all network interfaces for removable USB to Ethernet adapters. \
 When it finds one, it automatically sets it up and distributres IP addresses on this interface.", prog=progname)
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
-    parser.add_argument('-I', '--ip-addr', dest='ip_addr', type=str, help='Use the specified IP address and prefix for the USB interface in the CIDR notation', default='192.168.38.225/28')
-    parser.add_argument('-S', '--dhcp-range-size', type=int, dest='dhcp_range_size', help='the size of the DHCP range to distribute', default=10)
+    parser.add_argument('-I', '--ip-addr', dest='ip_addr', type=str, help='Use the specified IP address and prefix for the USB interface in the CIDR notation', default='192.168.38.225/29')
     
     args = parser.parse_args()
     
@@ -326,6 +323,10 @@ When it finds one, it automatically sets it up and distributres IP addresses on 
     handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s:%(lineno)d %(message)s"))
     logger.addHandler(handler)
     logger.propagate = False
+    
+    if os.getuid() != 0:
+        logger.error('This script should be run as root as if will run ifconfig and DHCP service which require root privileges')
+        raise Exception('RootRequired')
     
     ip_addr = None
     ip_netmask = None
