@@ -180,16 +180,20 @@ def process_secondary_if_events(on_link_up_callback, on_link_down_callback, on_d
 class InterfaceHandler:
     def __init__(self, ifname):
         self.ifname = ifname
+        self.link = False
         print('New interface ' + self.ifname)
         
     def set_link_up(self):
+        self.link = True
         print('Link is up for ' + self.ifname)
         
     def set_link_down(self):
+        self.link =  False
         print('Link is down for ' + self.ifname)
         
     def destroy(self):
-            print('Interface ' + self.ifname + ' is being destroyed')
+        self.set_link_down()
+        print('Interface ' + self.ifname + ' is being destroyed')
 
 class InterfacesWatcher:
     def __init__(self):
