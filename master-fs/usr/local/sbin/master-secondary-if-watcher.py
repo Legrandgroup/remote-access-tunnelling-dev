@@ -5,6 +5,7 @@
 #from __future__ import print_function
 
 import os
+import sys
 import socket
 import struct
 
@@ -12,6 +13,25 @@ import argparse
 
 import logging
 import logging.handlers
+
+import subprocess
+
+progname = os.path.basename(sys.argv[0])
+
+logging.basicConfig()
+logger = logging.getLogger(progname)
+
+#~ if args.debug:
+    #~ logger.setLevel(logging.DEBUG)
+#~ else:
+    #~ logger.setLevel(logging.INFO)
+
+logger.setLevel(logging.DEBUG)
+
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s:%(lineno)d %(message)s"))
+logger.addHandler(handler)
+logger.propagate = False
 
 # These constants map to constants in the Linux kernel. These should be set according to the target...
 RTMGRP_LINK=0x1
@@ -177,27 +197,64 @@ def process_secondary_if_events(on_link_up_callback, on_link_down_callback, on_d
         #~ else:
             #~ logger.warning('Unknown message')
 
+class DhcpService:
+    def __init__(self):
+        self.ip_addr = '192.168.38.225'
+        self.ip_netmask = '255.255.255.240'
+        self.dhcp_range_start = '192.168.38.226'
+        self.dhcp_range_end ='192.168.38.238'
+        
 class InterfaceHandler:
-    def __init__(self, ifname):
+    def __init__(self, ifname, watcher):
         self.ifname = ifname
+        self.parent_watcher = watcher
         self.link = False
-        print('New interface ' + self.ifname)
+        self.dnsmasq_pid_file = '/var/run/secondary-if-dnsmasq.' + ifname + '.pid'
+        self.dnsmasq_proc = None
+        self.dhcp_subnet = None
         
     def set_link_up(self):
-        self.link = True
-        print('Link is up for ' + self.ifname)
+        if not self.link:
+            self.link = True
+            print('Link is going up for ' + self.ifname)
+            try:
+                self.dhcp_subnet = self.parent_watcher.allocate_ip_subnet()
+                logger.debug('Using IP address ' + str(self.dhcp_subnet.ip_addr) + ' on interface ' + self.ifname)
+                cmd = ['ifconfig', self.ifname, str(self.dhcp_subnet.ip_addr), 'netmask', str(self.dhcp_subnet.ip_netmask)]
+                subprocess.check_call(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+                logger.debug('Distributing range ' + str(self.dhcp_subnet.dhcp_range_start) + '-' + str(self.dhcp_subnet.dhcp_range_end) + ' on interface ' + self.ifname)
+                cmd = ['dnsmasq', '-i', self.ifname, '-u', 'dnsmasq', '-k', '--leasefile-ro', '--dhcp-range=interface:' + self.ifname + ',' + str(self.dhcp_subnet.dhcp_range_start) + ',' + str(self.dhcp_subnet.dhcp_range_end) + ',30', '--port=0', '--dhcp-authoritative', '--log-dhcp', '-x', self.dnsmasq_pid_file]
+                subprocess.Popen(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+            except:
+                logger.error('Could not get a subnet to distribute')
+                raise
         
     def set_link_down(self):
+        if self.link:
+            print('Link is going down for ' + self.ifname)
+            if self.dnsmasq_proc is not None:
+                logger.debug('Withdrawing all DHCP service configuration on interface ' + self.ifname)
+                if not self.dnsmasq_proc.poll():
+                    logger.warn('Subprocess dnsmasq for interface ' + ifname + ' died unexpectedly')
+                else:
+                    self.dnsmasq_proc.terminate()
+                os.unlink(self.dnsmasq_pid_file)
+                self.dnsmasq_proc = None
+                cmd = ['ifconfig', self.ifname, '0.0.0.0']
+                subprocess.check_call(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+            if self.dhcp_subnet is not None:
+                self.parent_watcher.release_ip_subnet(self.dhcp_subnet)
+        
         self.link =  False
-        print('Link is down for ' + self.ifname)
         
     def destroy(self):
+        print('Interface ' + self.ifname + ' is being destroyed... performing cleanup')
         self.set_link_down()
-        print('Interface ' + self.ifname + ' is being destroyed')
 
 class InterfacesWatcher:
     def __init__(self):
         self._secondary_if_dict = {}
+        self._ip_subnet_allocated = None
         
     def if_link_up(self, ifname):
         if_handler = None
@@ -205,7 +262,7 @@ class InterfacesWatcher:
             if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
         except KeyError:
             print('Creating handler for interface ' + ifname)
-            self._secondary_if_dict[ifname] = InterfaceHandler(ifname)
+            self._secondary_if_dict[ifname] = InterfaceHandler(ifname, self)
             if_handler = self._secondary_if_dict[ifname]
         if_handler.set_link_up()
         
@@ -215,7 +272,7 @@ class InterfacesWatcher:
             if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
         except KeyError:
             print('Creating handler for interface ' + ifname)
-            self._secondary_if_dict[ifname] = InterfaceHandler(ifname)
+            self._secondary_if_dict[ifname] = InterfaceHandler(ifname, self)
             if_handler = self._secondary_if_dict[ifname]
         if_handler.set_link_down()
     
@@ -226,6 +283,19 @@ class InterfacesWatcher:
             del self._secondary_if_dict[ifname]
         except KeyError:
             pass
+            
+    def allocate_ip_subnet(self):
+        if self._ip_subnet_allocated:
+            raise Exception('DualSecondarySubnetNotSupported')
+        else:
+            self._ip_subnet_allocated = DhcpService()
+            return self._ip_subnet_allocated
+
+    def release_ip_subnet(self, ip_subnet):
+        if ip_subnet != self._ip_subnet_allocated:
+            raise Exception('UnknownSubnet')
+        else:
+            self._ip_subnet_allocated = None
 
 if __name__ == '__main__':
     ifW = InterfacesWatcher()
