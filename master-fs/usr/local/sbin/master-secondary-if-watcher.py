@@ -2,7 +2,7 @@
 
 # -*- coding: utf-8 -*-
 
-#from __future__ import print_function
+from __future__ import print_function
 
 import os
 import sys
@@ -18,20 +18,7 @@ import subprocess
 
 progname = os.path.basename(sys.argv[0])
 
-logging.basicConfig()
-logger = logging.getLogger(progname)
-
-#~ if args.debug:
-    #~ logger.setLevel(logging.DEBUG)
-#~ else:
-    #~ logger.setLevel(logging.INFO)
-
-logger.setLevel(logging.DEBUG)
-
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s:%(lineno)d %(message)s"))
-logger.addHandler(handler)
-logger.propagate = False
+logger = None
 
 # These constants map to constants in the Linux kernel. These should be set according to the target...
 RTMGRP_LINK=0x1
@@ -216,40 +203,40 @@ class InterfaceHandler:
     def set_link_up(self):
         if not self.link:
             self.link = True
-            logger.info('Link is going up for ' + self.ifname)
+            if logger: logger.info('Link is going up for ' + self.ifname)
             try:
                 self.dhcp_subnet = self.parent_watcher.allocate_ip_subnet()
-                logger.debug('Using IP address ' + str(self.dhcp_subnet.ip_addr) + ' on interface ' + self.ifname)
+                if logger: logger.debug('Using IP address ' + str(self.dhcp_subnet.ip_addr) + ' on interface ' + self.ifname)
                 cmd = ['ifconfig', self.ifname, str(self.dhcp_subnet.ip_addr), 'netmask', str(self.dhcp_subnet.ip_netmask)]
                 subprocess.check_call(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
-                logger.debug('Distributing range ' + str(self.dhcp_subnet.dhcp_range_start) + '-' + str(self.dhcp_subnet.dhcp_range_end) + ' on interface ' + self.ifname)
+                if logger: logger.debug('Distributing range ' + str(self.dhcp_subnet.dhcp_range_start) + '-' + str(self.dhcp_subnet.dhcp_range_end) + ' on interface ' + self.ifname)
                 cmd = ['dnsmasq', '-i', self.ifname, '-u', 'dnsmasq', '-k', '--leasefile-ro', '--dhcp-range=interface:' + self.ifname + ',' + str(self.dhcp_subnet.dhcp_range_start) + ',' + str(self.dhcp_subnet.dhcp_range_end) + ',30', '--port=0', '--dhcp-authoritative', '--log-dhcp', '-x', self.dnsmasq_pid_file]
                 self.dnsmasq_proc = subprocess.Popen(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
             except:
-                logger.error('Could not get a subnet to distribute')
+                if logger: logger.error('Could not get a subnet to distribute')
                 raise
         
     def set_link_down(self):
         if self.link:
-            logger.info('Link is going down for ' + self.ifname)
+            if logger: logger.info('Link is going down for ' + self.ifname)
             if self.dnsmasq_proc is not None:
-                logger.debug('Withdrawing all DHCP service configuration on interface ' + self.ifname)
+                if logger: logger.debug('Withdrawing all DHCP service configuration on interface ' + self.ifname)
                 dnsmasq_exitcode = self.dnsmasq_proc.poll()
                 if dnsmasq_exitcode is not None:
-                    logger.warn('Subprocess dnsmasq for interface ' + self.ifname + ' already died unexpectedly with exit code ' + str(dnsmasq_exitcode))
+                    if logger: logger.warn('Subprocess dnsmasq for interface ' + self.ifname + ' already died unexpectedly with exit code ' + str(dnsmasq_exitcode))
                 else:
                     self.dnsmasq_proc.terminate()
                 os.unlink(self.dnsmasq_pid_file)
                 self.dnsmasq_proc = None
                 cmd = ['ifconfig', self.ifname, '0.0.0.0']
-                subprocess.check_call(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+                subprocess.call(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)   # ifconfig may fail if network interface does not exist anymore
             if self.dhcp_subnet is not None:
                 self.parent_watcher.release_ip_subnet(self.dhcp_subnet)
         
         self.link =  False
         
     def destroy(self):
-        logger.debug('Interface ' + self.ifname + ' is being destroyed... performing cleanup')
+        if logger: logger.debug('Interface ' + self.ifname + ' is being destroyed... performing cleanup')
         self.set_link_down()
 
 class InterfacesWatcher:
@@ -299,5 +286,20 @@ class InterfacesWatcher:
             self._ip_subnet_allocated = None
 
 if __name__ == '__main__':
+    logging.basicConfig()
+    logger = logging.getLogger(progname)
+
+    #~ if args.debug:
+        #~ logger.setLevel(logging.DEBUG)
+    #~ else:
+        #~ logger.setLevel(logging.INFO)
+
+    logger.setLevel(logging.DEBUG)
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s:%(lineno)d %(message)s"))
+    logger.addHandler(handler)
+    logger.propagate = False
+
     ifW = InterfacesWatcher()
     process_secondary_if_events(ifW.if_link_up, ifW.if_link_down, ifW.if_destroyed) # Run main loop
