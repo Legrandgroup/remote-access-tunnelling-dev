@@ -1,6 +1,6 @@
 #!/bin/sh
 # udev agent script
-
+set -x
 HOTPLUGFUNCS=/lib/udev/hotplug.functions
 [ -f $HOTPLUGFUNCS ] || exit 1
 . $HOTPLUGFUNCS
@@ -12,13 +12,33 @@ fi
 
 DHCP_SERVER_PID_FILE=/var/run/master-if-dnsmasq.pid
 
+# wait for networking to be available, taken from net.agent (ifupdown)
+wait_for_interface() {
+    waitifc=$1
+
+    while :; do
+        ifcstate="$(cat /sys/class/net/${waitifc}/operstate 2>/dev/null || true)"
+        if [ "$ifcstate" != down ]; then
+                return 0
+        fi
+        sleep 1
+    done
+}
+
 enable_terminal_if() {
     ifconfig "$INTERFACE" 192.168.38.225 netmask 255.255.255.240
     dnsmasq -i "$INTERFACE" -u dnsmasq --dhcp-range=interface:eth1,192.168.38.226,192.168.38.238,30 --port=0 --dhcp-authoritative --log-dhcp -x "$DHCP_SERVER_PID_FILE"
+    sleep 0.2	# Wait for PID file to be created for sure
+    mesg "dnsmasq[`cat "$DHCP_SERVER_PID_FILE"`] started on interface $INTERFACE"
 }
 
 disable_terminal_if() {
-    kill $(cat $DHCP_SERVER_PID_FILE)
+    dnsmasq_pid=$(cat $DHCP_SERVER_PID_FILE)
+    mesg "dnsmasq_pid='$dnsmasq_pid'"
+    if [ -n "$dnsmasq_pid" ]; then
+        mesg "Killing dnsmasq[$dnsmasq_pid] during shutdown of interface $INTERFACE"
+        kill $(cat $DHCP_SERVER_PID_FILE)
+    fi
     rm -f $DHCP_SERVER_PID_FILE
     ifconfig "$INTERFACE" 0.0.0.0 2>/dev/null || :
 }
@@ -39,7 +59,7 @@ terminal_if_daemon () {
     if test -L "/sys/class/net/$INTERFACE/device/subsystem"; then
         link_target=$(readlink "/sys/class/net/$INTERFACE/device/subsystem")
         if echo "$link_target" | grep -q '/bus/usb$'; then
-            logger "Info: Interface $INTERFACE is our secondary interface"
+            mesg "Info: Interface $INTERFACE is our secondary interface"
             case "$ACTION" in
             add|register)
                 # wait for loopback interface to exist, we may have
@@ -49,7 +69,7 @@ terminal_if_daemon () {
                 enable_terminal_if
                 ;;
             remove|unregister)
-                disable_terminal if
+                disable_terminal_if
                 ;;
             esac
         fi
