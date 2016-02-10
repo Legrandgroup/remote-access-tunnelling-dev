@@ -216,7 +216,7 @@ class InterfaceHandler:
     def set_link_up(self):
         if not self.link:
             self.link = True
-            print('Link is going up for ' + self.ifname)
+            logger.info('Link is going up for ' + self.ifname)
             try:
                 self.dhcp_subnet = self.parent_watcher.allocate_ip_subnet()
                 logger.debug('Using IP address ' + str(self.dhcp_subnet.ip_addr) + ' on interface ' + self.ifname)
@@ -224,18 +224,19 @@ class InterfaceHandler:
                 subprocess.check_call(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
                 logger.debug('Distributing range ' + str(self.dhcp_subnet.dhcp_range_start) + '-' + str(self.dhcp_subnet.dhcp_range_end) + ' on interface ' + self.ifname)
                 cmd = ['dnsmasq', '-i', self.ifname, '-u', 'dnsmasq', '-k', '--leasefile-ro', '--dhcp-range=interface:' + self.ifname + ',' + str(self.dhcp_subnet.dhcp_range_start) + ',' + str(self.dhcp_subnet.dhcp_range_end) + ',30', '--port=0', '--dhcp-authoritative', '--log-dhcp', '-x', self.dnsmasq_pid_file]
-                subprocess.Popen(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+                self.dnsmasq_proc = subprocess.Popen(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
             except:
                 logger.error('Could not get a subnet to distribute')
                 raise
         
     def set_link_down(self):
         if self.link:
-            print('Link is going down for ' + self.ifname)
+            logger.info('Link is going down for ' + self.ifname)
             if self.dnsmasq_proc is not None:
                 logger.debug('Withdrawing all DHCP service configuration on interface ' + self.ifname)
-                if not self.dnsmasq_proc.poll():
-                    logger.warn('Subprocess dnsmasq for interface ' + ifname + ' died unexpectedly')
+                dnsmasq_exitcode = self.dnsmasq_proc.poll()
+                if dnsmasq_exitcode is not None:
+                    logger.warn('Subprocess dnsmasq for interface ' + self.ifname + ' already died unexpectedly with exit code ' + str(dnsmasq_exitcode))
                 else:
                     self.dnsmasq_proc.terminate()
                 os.unlink(self.dnsmasq_pid_file)
@@ -248,7 +249,7 @@ class InterfaceHandler:
         self.link =  False
         
     def destroy(self):
-        print('Interface ' + self.ifname + ' is being destroyed... performing cleanup')
+        logger.debug('Interface ' + self.ifname + ' is being destroyed... performing cleanup')
         self.set_link_down()
 
 class InterfacesWatcher:
@@ -261,7 +262,7 @@ class InterfacesWatcher:
         try:
             if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
         except KeyError:
-            print('Creating handler for interface ' + ifname)
+            #~ print('Creating handler for interface ' + ifname)
             self._secondary_if_dict[ifname] = InterfaceHandler(ifname, self)
             if_handler = self._secondary_if_dict[ifname]
         if_handler.set_link_up()
@@ -271,7 +272,7 @@ class InterfacesWatcher:
         try:
             if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
         except KeyError:
-            print('Creating handler for interface ' + ifname)
+            #~ print('Creating handler for interface ' + ifname)
             self._secondary_if_dict[ifname] = InterfaceHandler(ifname, self)
             if_handler = self._secondary_if_dict[ifname]
         if_handler.set_link_down()
