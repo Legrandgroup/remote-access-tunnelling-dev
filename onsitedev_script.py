@@ -86,11 +86,20 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         pid_file = open(str(pid_file_path), 'w')
         pid_file.write(str(os.getpid()))
         pid_file.close()
-    onsite_dev = OnsiteDev(username='rpi1100', logger=logger)
+        
+    username = 'rpi1100'
+    onsite_dev = OnsiteDev(username=username, logger=logger)
     
     if not args.uplink_dev_3g is None:  # We must add the specific route to the rdv server before we execute rdv_server_connect()
         onsite_dev.add_host_route(host_ip=onsite_dev.get_rdv_server(), iface=args.uplink_dev_3g, ip_use_sudo=True)
-        
+    
+    msg = 'Connecting to RDV server'
+    if args.with_stunnel:
+        msg += ' over an SSL tunnel'
+    else:
+        msg += ' directly over SSH (' + str(onsite_dev.get_rdv_server()) + ')'
+    msg += ' as user account "' + username + '"'
+    logger.info(msg)
     onsite_dev.rdv_server_connect(using_stunnel=args.with_stunnel)
     # Sanity check
     if onsite_dev.run_get_role() != 'onsite':

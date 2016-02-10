@@ -98,7 +98,17 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.propagate = False
     
     logger.debug('Starting as PID ' + str(os.getpid()))
-    master_dev = MasterDev(username='rpi1101', logger=logger)
+    
+    username = 'rpi1101'
+    master_dev = MasterDev(username=username, logger=logger)
+    
+    msg = 'Connecting to RDV server'
+    if args.with_stunnel:
+        msg += ' over an SSL tunnel'
+    else:
+        msg += ' directly over SSH (' + str(master_dev.get_rdv_server()) + ')'
+    msg += ' as user account "' + username + '"'
+    logger.info(msg)
     master_dev.rdv_server_connect(using_stunnel=args.with_stunnel)
     logger.info('Connecting to onsite ' + remote_onsite)
     unavail_onsite_msg = 'Could not connect to ' + remote_onsite + '. It is not connected (yet). Waiting'
