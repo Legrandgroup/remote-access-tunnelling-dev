@@ -414,26 +414,6 @@ class TunnellingDev(object):
         """
         return self._strip_trailing_cr_from(self.run_command('get_vtun_parameters', 20))
     
-    def run_get_vtun_client_up_additional_commands(self):
-        """ Run the command get_vtun_client_up_additional_commands on the remote tundev shell
-        \return The commands to add to the up block of vtun client side configuration file
-        """
-        command_list = self.run_command('get_vtun_client_up_additional_commands').split('\n')
-        cleaned_command_list = []
-        for command in command_list:
-            cleaned_command_list += [self._strip_trailing_cr_from(command)]
-        return cleaned_command_list
-    
-    def run_get_vtun_client_down_additional_commands(self):
-        """ Run the command get_vtun_client_down_additional_commands on the remote tundev shell
-        \return The commands to add to the down block of vtun client side configuration file
-        """
-        command_list = self.run_command('get_vtun_client_down_additional_commands').split('\n')
-        cleaned_command_list = []
-        for command in command_list:
-            cleaned_command_list += [self._strip_trailing_cr_from(command)]
-        return cleaned_command_list
-    
     class ClientVtunTunnelConfig(object):
         """ Class representing a tunnelling device configuration as provided by the remote tundev shell command get_vtun_parameters
         This class is just a container around a python dict, with one method allowing to generate a pythonvtunlib.client_vtun_tunnel based on the parameters contained in the self.dict attribute  
