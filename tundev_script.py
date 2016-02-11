@@ -489,7 +489,7 @@ class TunnellingDev(object):
                     for command in str(self.config_dict['up_additional_commands']).split(';'):
                         client_vtun_tunnel_object.add_up_command(command)
                 if self.tunnel_mode == 'L3':    # In L3 mode, activating routing on this tundev
-                    client_vtun_tunnel_object.add_up_command('/sbin/ip "route add table 1 dev %% default via ' + self.config_dict['tunnelling_dev_ip_address'] + '"')
+                    client_vtun_tunnel_object.add_up_command('/sbin/ip "route add table 1 dev %% default via %A"')
                     client_vtun_tunnel_object.add_up_command('/sbin/ip "rule add unicast iif ' + self.config_dict['extremity_if'] + ' table 1"')
                     if self.config_dict['nat_to_external']:    # NAT to external interface is used by onsite only
                         # Add a NAT rule using iptables
@@ -507,7 +507,7 @@ class TunnellingDev(object):
                         # Remove the NAT rule using iptables
                         client_vtun_tunnel_object.add_down_command('/sbin/iptables "-t nat -D POSTROUTING -o ' + self.config_dict['extremity_if'] + ' -j MASQUERADE"')
                     client_vtun_tunnel_object.add_down_command('/sbin/ip "rule del unicast iif ' + self.config_dict['extremity_if'] + ' table 1"')
-                    client_vtun_tunnel_object.add_down_command('/sbin/ip "route del table 1 dev %% default via ' + self.config_dict['tunnelling_dev_ip_address'] + '"')
+                    client_vtun_tunnel_object.add_down_command('/sbin/ip "route del table 1 dev %% default via %A"')
                 elif self.tunnel_mode == 'L2':    # In L2 mode, stop bridging
                     client_vtun_tunnel_object.add_down_command('/sbin/ip "link set ' + self.config_dict['bridge_if'] + ' down"')
                     client_vtun_tunnel_object.add_down_command('/sbin/brctl "delif ' + self.config_dict['bridge_if'] + ' %%"')
