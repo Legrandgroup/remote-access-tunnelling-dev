@@ -464,10 +464,7 @@ class TunnellingDev(object):
                                                            vtun_connection_timeout=self.vtun_connection_timeout
                                                            )
                 
-                # Create post tunnel-setup script (up commands)
-                if str(self.config_dict['up_additional_commands']):
-                    for command in str(self.config_dict['up_additional_commands']).split(';'):
-                        client_vtun_tunnel_object.add_up_command(command)
+                # Create post tunnel-setup script (up commands
                 if self.tunnel_mode == 'L3':    # In L3 mode, activating routing on this tundev
                     client_vtun_tunnel_object.add_up_command('/sbin/ip "route add table 1 dev %% default via %A"')
                     client_vtun_tunnel_object.add_up_command('/sbin/ip "rule add unicast iif ' + self.config_dict['extremity_if'] + ' table 1"')
@@ -494,10 +491,6 @@ class TunnellingDev(object):
                     client_vtun_tunnel_object.add_down_command('/sbin/brctl "delif ' + self.config_dict['bridge_if'] + ' ' + self.config_dict['extremity_if'] + '"')
                     client_vtun_tunnel_object.add_down_command('/sbin/modprobe "-r bridge"')    #Lionel: FIXME: Why not brctl delbr?
                     client_vtun_tunnel_object.add_down_command('/sbin/modprobe "bridge"')
-                
-                if str(self.config_dict['down_additional_commands']):
-                    for command in str(self.config_dict['down_additional_commands']).split(';'):
-                        client_vtun_tunnel_object.add_down_command(command)
                 
                 return client_vtun_tunnel_object
             except KeyError:
