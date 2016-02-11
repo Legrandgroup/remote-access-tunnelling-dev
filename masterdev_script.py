@@ -158,6 +158,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     try:
         with open('/var/run/extremity_if') as f:
             extremity_if = f.readline(64)   # Try to read the extermity interface from the filesystem
+            extermity_if.rstrip('\n')
             logger.debug('Read extremity network interface ' + extremity_if + ' from /var/run/extremity_if')
     except IOError:
         pass
