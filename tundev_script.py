@@ -483,14 +483,29 @@ class TunnellingDev(object):
                                                            mode=self.tunnel_mode,
                                                            vtun_connection_timeout=self.vtun_connection_timeout
                                                            )
+                
+                # Create post tunnel-setup script (up commands)
                 if str(self.config_dict['up_additional_commands']):
                     for command in str(self.config_dict['up_additional_commands']).split(';'):
                         client_vtun_tunnel_object.add_up_command(command)
                 if self.tunnel_mode == 'L3':    # In L3 mode, activating routing on this tundev
                     client_vtun_tunnel_object.add_up_command('/sbin/sysctl "net.ipv4.ip_forward=1"')
+                elif self.tunnel_mode == 'L2':    # In L2 mode, setup bridging
+                    client_vtun_tunnel_object.add_up_command('/sbin/brctl "addbr ' + self.config_dict['bridge_if'] + '"')
+                    client_vtun_tunnel_object.add_up_command('/sbin/brctl "addif ' + self.config_dict['bridge_if'] + ' ' + self.config_dict['extremity_interface'] + '"')
+                    client_vtun_tunnel_object.add_up_command('/sbin/brctl "addif ' + self.config_dict['bridge_if'] + ' tap0"')  # Lionel: FIXME: use vtun's variable %% ?
+                    client_vtun_tunnel_object.add_up_command('/sbin/ip "link set ' + self.config_dict['bridge_if'] + ' up"')
                 
+                # Create post tunnel-teardown script (down commands)
                 if self.tunnel_mode == 'L3':    # In L3 mode, stop routing on this tundev
                     client_vtun_tunnel_object.add_down_command('/sbin/sysctl "net.ipv4.ip_forward=0"')
+                elif self.tunnel_mode == 'L2':    # In L2 mode, stop bridging
+                    client_vtun_tunnel_object.add_down_command('/sbin/ip "link set ' + self.config_dict['bridge_if'] + ' down"')
+                    client_vtun_tunnel_object.add_down_command('/sbin/brctl "delif ' + self.config_dict['bridge_if'] + ' tap0"')  # Lionel: FIXME: use vtun's variable %% ?
+                    client_vtun_tunnel_object.add_down_command('/sbin/brctl "delif ' + self.config_dict['bridge_if'] + ' ' + self.config_dict['extremity_interface'] + '"')
+                    client_vtun_tunnel_object.add_down_command('/sbin/modprobe "-r bridge"')    #Lionel: FIXME: Why not brctl delbr?
+                    client_vtun_tunnel_object.add_down_command('/sbin/modprobe "bridge"')
+                
                 if str(self.config_dict['down_additional_commands']):
                     for command in str(self.config_dict['down_additional_commands']).split(';'):
                         client_vtun_tunnel_object.add_down_command(command)
@@ -546,6 +561,13 @@ class TunnellingDev(object):
         """
         tunnel_name = 'tundev' + str(self._ssh_username)
         config_dict = self._get_vtun_parameters_as_dict()
+        config_dict['lan_interface'] = 'eth0'
+        if tunnel_mode == 'L2':
+            config_dict['bridge_if'] = 'br0'
+            config_dict['extremity_interface'] = 'eth1'  # Should never bridge with eth0 in L2 on master, should tdo it on onsite
+        else:
+            config_dict['extremity_interface'] = 'eth0'  # Note: this should be eth1 in master mode with a USB Ethernet interface
+        
         try:
             self.ssh_remote_tcp_port = config_dict['rdv_server_vtun_tcp_port']
         except KeyError:
