@@ -125,6 +125,8 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     tunnel_mode = onsite_dev.run_get_tunnel_mode()
     
     locally_redirected_vtun_server_port = 5000
+    
+    logger.debug('Going to setup vtun tunnel in mode ' + tunnel_mode)
     vtun_client_config = onsite_dev.get_client_vtun_tunnel(tunnel_mode,
                                                            extremity_if='eth0',
                                                            vtun_server_hostname='127.0.0.1',

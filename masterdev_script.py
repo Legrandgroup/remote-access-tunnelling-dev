@@ -154,8 +154,18 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     tunnel_mode = master_dev.run_get_tunnel_mode()
     
     locally_redirected_vtun_server_port = 5000
-    extremity_if='eth0'
-    extermity_if='eth1' # For master with a USB to Ethernet dongle
+    extremity_if=None
+    try:
+        with open('/var/run/extremity_if') as f:
+            extremity_if = f.readline(64)   # Try to read the extermity interface from the filesystem
+            logger.debug('Read extremity network interface ' + extremity_if + ' from /var/run/extremity_if')
+    except IOError:
+        pass
+    
+    if extremity_if is None or extremity_if == '':
+        extermity_if='eth0'
+    
+    logger.debug('Going to setup vtun tunnel in mode ' + tunnel_mode + ' with extermity interface ' + extremity_if)
     vtun_client_config = master_dev.get_client_vtun_tunnel(tunnel_mode,
                                                            extremity_if=extremity_if,
                                                            vtun_server_hostname='127.0.0.1',
