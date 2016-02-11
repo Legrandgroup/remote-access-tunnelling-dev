@@ -126,10 +126,13 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     locally_redirected_vtun_server_port = 5000
     vtun_client_config = onsite_dev.get_client_vtun_tunnel(tunnel_mode,
+                                                           extremity_if='eth0',
                                                            vtun_server_hostname='127.0.0.1',
                                                            vtun_server_port=locally_redirected_vtun_server_port,
                                                            vtund_exec='/usr/local/sbin/vtund',
-                                                           vtund_use_sudo=True)  # Returns a pythonvtunlib.client_vtun_tunnel object
+                                                           vtund_use_sudo=True,
+                                                           nat_to_external=(tunnel_mode == 'L3')   # Always use a NAT towards the LAN for onsite devices in L2 mode
+                                                          )  # Returns a pythonvtunlib.client_vtun_tunnel object
     
     vtun_client = vtun_client_config.to_client_vtun_tunnel_object()
     onsite_dev._assert_ssh_escape_shell()

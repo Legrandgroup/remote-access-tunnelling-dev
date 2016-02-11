@@ -489,20 +489,29 @@ class TunnellingDev(object):
                     for command in str(self.config_dict['up_additional_commands']).split(';'):
                         client_vtun_tunnel_object.add_up_command(command)
                 if self.tunnel_mode == 'L3':    # In L3 mode, activating routing on this tundev
+                    client_vtun_tunnel_object.add_up_command('/sbin/ip "route add table 1 dev %% default via ' + self.config_dict['tunnelling_dev_ip_address'] + '"')
+                    client_vtun_tunnel_object.add_up_command('/sbin/ip "rule add unicast iif ' + self.config_dict['extremity_if'] + ' table 1"')
+                    if self.config_dict['nat_to_external']:    # NAT to external interface is used by onsite only
+                        # Add a NAT rule using iptables
+                        client_vtun_tunnel_object.add_up_command('/sbin/iptables "-t nat -A POSTROUTING -o ' + self.config_dict['extremity_if'] + ' -j MASQUERADE"')
                     client_vtun_tunnel_object.add_up_command('/sbin/sysctl "net.ipv4.ip_forward=1"')
                 elif self.tunnel_mode == 'L2':    # In L2 mode, setup bridging
                     client_vtun_tunnel_object.add_up_command('/sbin/brctl "addbr ' + self.config_dict['bridge_if'] + '"')
-                    client_vtun_tunnel_object.add_up_command('/sbin/brctl "addif ' + self.config_dict['bridge_if'] + ' ' + self.config_dict['extremity_interface'] + '"')
+                    client_vtun_tunnel_object.add_up_command('/sbin/brctl "addif ' + self.config_dict['bridge_if'] + ' ' + self.config_dict['extremity_if'] + '"')
                     client_vtun_tunnel_object.add_up_command('/sbin/brctl "addif ' + self.config_dict['bridge_if'] + ' %%"')
                     client_vtun_tunnel_object.add_up_command('/sbin/ip "link set ' + self.config_dict['bridge_if'] + ' up"')
                 
                 # Create post tunnel-teardown script (down commands)
                 if self.tunnel_mode == 'L3':    # In L3 mode, stop routing on this tundev
-                    client_vtun_tunnel_object.add_down_command('/sbin/sysctl "net.ipv4.ip_forward=0"')
+                    if self.config_dict['nat_to_external']:    # NAT to external interface is used by onsite only
+                        # Remove the NAT rule using iptables
+                        client_vtun_tunnel_object.add_down_command('/sbin/iptables "-t nat -D POSTROUTING -o ' + self.config_dict['extremity_if'] + ' -j MASQUERADE"')
+                    client_vtun_tunnel_object.add_down_command('/sbin/ip "rule del unicast iif ' + self.config_dict['extremity_if'] + ' table 1"')
+                    client_vtun_tunnel_object.add_down_command('/sbin/ip "route del table 1 dev %% default via ' + self.config_dict['tunnelling_dev_ip_address'] + '"')
                 elif self.tunnel_mode == 'L2':    # In L2 mode, stop bridging
                     client_vtun_tunnel_object.add_down_command('/sbin/ip "link set ' + self.config_dict['bridge_if'] + ' down"')
                     client_vtun_tunnel_object.add_down_command('/sbin/brctl "delif ' + self.config_dict['bridge_if'] + ' %%"')
-                    client_vtun_tunnel_object.add_down_command('/sbin/brctl "delif ' + self.config_dict['bridge_if'] + ' ' + self.config_dict['extremity_interface'] + '"')
+                    client_vtun_tunnel_object.add_down_command('/sbin/brctl "delif ' + self.config_dict['bridge_if'] + ' ' + self.config_dict['extremity_if'] + '"')
                     client_vtun_tunnel_object.add_down_command('/sbin/modprobe "-r bridge"')    #Lionel: FIXME: Why not brctl delbr?
                     client_vtun_tunnel_object.add_down_command('/sbin/modprobe "bridge"')
                 
@@ -512,7 +521,7 @@ class TunnellingDev(object):
                 
                 return client_vtun_tunnel_object
             except KeyError:
-                raise Exception('IncompleteTunnelParameters')
+                raise
             
         def check_ping_peer(self):
             """ Check that the tunnel is up and the peer remote inside the tunnel is responding to ping
@@ -547,26 +556,27 @@ class TunnellingDev(object):
             config_dict[key]=value
         return config_dict
     
-    def get_client_vtun_tunnel(self, tunnel_mode, vtun_server_hostname, vtun_server_port, vtund_exec = None,  vtund_use_sudo = False, vtun_connection_timeout = 20):
+    def get_client_vtun_tunnel(self, tunnel_mode, extremity_if, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtund_use_sudo = False, vtun_connection_timeout = 20, nat_to_external = False):
         """ Create a pythonvtunlib.client_vtun_tunnel object based on the configuration returned by the devshell command get_vtun_parameters
         
         If the vtun_parameters_dict provided by the internal call to self._get_vtun_parameters_as_dict() does not have (enough) information to build a client tunnel, an exception will be raised
         \param tunnel_mode The tunnel mode ('L2', 'L3' etc...)
+        \param extremity_if The external network interface (towards the support terminal for master, or toward the customer LAN for onsite)
         \param vtun_server_hostname The hostname to connect to (the vtund server)
         \param vtun_server_port The TCP port to use when connecting to the vtund server  
         \param vtund_exec (optional) The PATH to the vtund binary
         \param vtund_use_sudo (optional) A boolean indicating whether the vtund_exec needs to be run via sudo to get root access (False by default)
         \param vtun_connection_timeout How many seconds we give for the tunnel establishment (20 by default)
+        \param nat_to_external (default False) Do we also add a NAT rule to take the paternity of all traffic incoming from the tunnel? This is used only by onsite clients, and will only be applied in L2 mode
         \return The resulting ClientVtunTunnelConfig object
         """
         tunnel_name = 'tundev' + str(self._ssh_username)
         config_dict = self._get_vtun_parameters_as_dict()
+        config_dict['nat_to_external'] = nat_to_external
         config_dict['lan_interface'] = 'eth0'
+        config_dict['extremity_if'] = extremity_if
         if tunnel_mode == 'L2':
             config_dict['bridge_if'] = 'br0'
-            config_dict['extremity_interface'] = 'eth1'  # Should never bridge with eth0 in L2 on master, should tdo it on onsite
-        else:
-            config_dict['extremity_interface'] = 'eth0'  # Note: this should be eth1 in master mode with a USB Ethernet interface
         
         try:
             self.ssh_remote_tcp_port = config_dict['rdv_server_vtun_tcp_port']
@@ -578,9 +588,9 @@ class TunnellingDev(object):
                                                     tunnel_name=tunnel_name,
                                                     vtun_server_hostname=vtun_server_hostname,
                                                     vtun_server_port=vtun_server_port,
-                                                    vtund_exec = vtund_exec,
-                                                    vtund_use_sudo = vtund_use_sudo,
-                                                    vtun_connection_timeout = vtun_connection_timeout)
+                                                    vtund_exec=vtund_exec,
+                                                    vtund_use_sudo=vtund_use_sudo,
+                                                    vtun_connection_timeout=vtun_connection_timeout)
     def get_ssh_process(self):
         if self._exp is None:
             raise Exception('SSHSessionNotLaunched')

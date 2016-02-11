@@ -154,11 +154,16 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     tunnel_mode = master_dev.run_get_tunnel_mode()
     
     locally_redirected_vtun_server_port = 5000
+    extremity_if='eth0'
+    extermity_if='eth1' # For master with a USB to Ethernet dongle
     vtun_client_config = master_dev.get_client_vtun_tunnel(tunnel_mode,
+                                                           extremity_if=extremity_if,
                                                            vtun_server_hostname='127.0.0.1',
                                                            vtun_server_port=locally_redirected_vtun_server_port,
                                                            vtund_exec='/usr/local/sbin/vtund',
-                                                           vtund_use_sudo=True)  # Returns a pythonvtunlib.client_vtun_tunnel object
+                                                           vtund_use_sudo=True,
+                                                           nat_to_external=False    # Never use a NAT on master devices
+                                                          )  # Returns a pythonvtunlib.client_vtun_tunnel object
     
     vtun_client = vtun_client_config.to_client_vtun_tunnel_object()
     master_dev._assert_ssh_escape_shell()
