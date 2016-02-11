@@ -493,7 +493,7 @@ class TunnellingDev(object):
                 elif self.tunnel_mode == 'L2':    # In L2 mode, setup bridging
                     client_vtun_tunnel_object.add_up_command('/sbin/brctl "addbr ' + self.config_dict['bridge_if'] + '"')
                     client_vtun_tunnel_object.add_up_command('/sbin/brctl "addif ' + self.config_dict['bridge_if'] + ' ' + self.config_dict['extremity_interface'] + '"')
-                    client_vtun_tunnel_object.add_up_command('/sbin/brctl "addif ' + self.config_dict['bridge_if'] + ' tap0"')  # Lionel: FIXME: use vtun's variable %% ?
+                    client_vtun_tunnel_object.add_up_command('/sbin/brctl "addif ' + self.config_dict['bridge_if'] + ' %%"')
                     client_vtun_tunnel_object.add_up_command('/sbin/ip "link set ' + self.config_dict['bridge_if'] + ' up"')
                 
                 # Create post tunnel-teardown script (down commands)
@@ -501,7 +501,7 @@ class TunnellingDev(object):
                     client_vtun_tunnel_object.add_down_command('/sbin/sysctl "net.ipv4.ip_forward=0"')
                 elif self.tunnel_mode == 'L2':    # In L2 mode, stop bridging
                     client_vtun_tunnel_object.add_down_command('/sbin/ip "link set ' + self.config_dict['bridge_if'] + ' down"')
-                    client_vtun_tunnel_object.add_down_command('/sbin/brctl "delif ' + self.config_dict['bridge_if'] + ' tap0"')  # Lionel: FIXME: use vtun's variable %% ?
+                    client_vtun_tunnel_object.add_down_command('/sbin/brctl "delif ' + self.config_dict['bridge_if'] + ' %%"')
                     client_vtun_tunnel_object.add_down_command('/sbin/brctl "delif ' + self.config_dict['bridge_if'] + ' ' + self.config_dict['extremity_interface'] + '"')
                     client_vtun_tunnel_object.add_down_command('/sbin/modprobe "-r bridge"')    #Lionel: FIXME: Why not brctl delbr?
                     client_vtun_tunnel_object.add_down_command('/sbin/modprobe "bridge"')
