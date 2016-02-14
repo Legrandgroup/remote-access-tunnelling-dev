@@ -84,7 +84,21 @@ class TunnellingDev(object):
             return None
         
         return ipaddr.IPv4Network(str(ip) + '/' + str(netmask)) 
-
+    
+    def _get_linux_nameserver_list(self):
+        """ Returns the list of currently configured nameservers (DNS servers) on the current Linux OS (reads resolv.conf)
+        \return A list of ipaddr.IPv4Address objects containing all nameservers
+        """
+        nameservers=[]
+        with open('/etc/resolv.conf', 'r') as f:
+            etc_resolvconf = f.readlines()
+            for line in etc_resolvconf:
+                line = line.rstrip('\n').strip()
+                match = re.match(r'nameserver\s([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)', line) # Search for IPv4 nameservers
+                if match:
+                    nameservers+=[ipaddr.IPv4Address(match.group(1))]
+        return nameservers
+    
     def add_host_route(self, host_ip, iface, ip_use_sudo = False):
         """ Add a route to a specific host to the default routing table
         \param host_ip The IP address of the host
@@ -110,10 +124,10 @@ class TunnellingDev(object):
         next_hop = None
         subproc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=open(os.devnull, 'wb'))
         for rule in subproc.stdout:
-            print('Got line "' + rule + '"')
+            #~ print('Got line "' + rule + '"')
             match = re.match(regexp1, rule) # Try the via (gateway) route pattern
             if match:
-                print('Match1')
+                #~ print('Match1')
                 if match.group(3) == iface: # Does this entry for the interface we are interested on
                     rule_router = match.group(2)   # Match 2 of regexp1 is the next hop router
                     rule_target = match.group(1) # Match 1 of regexp1 is the rule's destination host or network
@@ -122,7 +136,7 @@ class TunnellingDev(object):
                         self.logger.warning('Routing rule for host ' + str(host_ip) + ' on interface ' + iface + ' already exists')
                         return
                     
-                    print('Seen a route to ' + rule_target)
+                    #~ print('Seen a route to ' + rule_target)
                     if next_hop is None:
                         next_hop = ipaddr.IPv4Address(rule_router)
                     elif rule_router != str(next_hop):
@@ -130,7 +144,7 @@ class TunnellingDev(object):
             else:
                 match = re.match(regexp2, rule) # Try the peer-to-peer (tunnel) route pattern
                 if match:
-                    print('Match2')
+                    #~ print('Match2')
                     if match.group(2) == iface: # This is the entry for the interface we are interested on
                         rule_router = match.group(1)   # Match 1 of regexp2 is the next hop router
                         if next_hop is None or next_hop == rule_router:
@@ -380,7 +394,18 @@ class TunnellingDev(object):
         """ Send the IP addressing for the interface iface to the remote tundev shell
         \param iface The network interface for which we will extract the IP address
         """
-        self.run_set_tunnelling_dev_lan_ip_address(self._get_ip_network(iface))
+        self.run_set_tunnelling_dev_lan_ip_address(self._get_ip_network())
+    
+    def run_set_tunnelling_dev_dns_server_list(self, dns_list):
+        """ Run the command run_set_tunnelling_dev_dns_server_list on the remote tundev shell
+        \param dns_list a list of ipaddr.IPv4Network objects representing DNS servers to communicate to the RDV server
+        """
+        self.run_command('set_tunnelling_dev_dns_server_list ' + ' '.join(str(dns) for dns in dns_list))
+    
+    def send_lan_dns_config(self):
+        """ Send the DNS configuration for the current host to the remote tundev shell
+        """
+        self.run_set_tunnelling_dev_dns_server_list(self._get_linux_nameserver_list())
 
     def run_get_role(self):
         """ Run the command get_role on the remote tundev shell
