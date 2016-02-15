@@ -312,6 +312,9 @@ When it finds one, it automatically sets it up and distributres IP addresses on 
     
     # Setup logging
     logging.basicConfig()
+    if not args.debug:
+        progname = progname.split('.')[0]   # Remove .py extension when logging in non-debug mode
+    
     logger = logging.getLogger(progname)
 
     if args.debug:
@@ -319,7 +322,11 @@ When it finds one, it automatically sets it up and distributres IP addresses on 
     else:
         logger.setLevel(logging.INFO)
     
-    handler = logging.StreamHandler()
+    if args.debug:
+        handler = logging.StreamHandler()
+    else:
+        handler = loggin.handlers.WatchedFileHandler('/var/log' + progname + '.log')
+    
     handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s:%(lineno)d %(message)s"))
     logger.addHandler(handler)
     logger.propagate = False
