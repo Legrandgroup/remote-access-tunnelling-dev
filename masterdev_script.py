@@ -71,19 +71,15 @@ if __name__ == '__main__':
 and automates the typing of tundev shell commands from the tunnelling devices side in order to setup a tunnel session", prog=progname)
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
     parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
+    parser.add_argument('-l', '--list-onsite', dest='list_onsite', action='store_true', help='lists the currently available onsite devices')
     parser.add_argument('-m', '--tunnel-mode', dest='tunnel_mode', help='the OSI level for the tunnel (L2 or L3)', default='L3')
     parser.add_argument('-t', '--session-time', type=int, dest='session_time', help='specify session duration (in seconds)', default=-1)
     parser.add_argument('-o', '--onsite', type=str, action='store', help='ID of the onsite device to connect to', default=None)
+    
     args = parser.parse_args()
 
     # Setup logging
     logging.basicConfig()
-    
-    if args.onsite is None:
-        print(progname + ': Error: --onsite argument is mandatory', file=sys.stderr)
-        exit(1)
-    else:
-        remote_onsite=args.onsite # The remote onsite dev to which we want to connect
     
     logger = logging.getLogger(progname)
     
@@ -110,6 +106,27 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     msg += ' as user account "' + username + '"'
     logger.info(msg)
     master_dev.rdv_server_connect(using_stunnel=args.with_stunnel)
+    
+    if args.list_onsite:
+        print('Currently available onsite devices:')
+        total_onsite_devs = 0
+        for onsite_dev in master_dev.get_online_onsite_dev():
+            total_onsite_devs += 1
+            print(onsite_dev)
+        if total_onsite_devs == 0:
+            print('No onsite device currently available')
+        else:
+            print('Total: ' + str(total_onsite_devs))
+        if args.onsite is None:
+            exit(0) # List only mode, do not connect
+    
+    if args.onsite is None:
+        print(progname + ': Error: --onsite argument is mandatory if --list-onsite is not used', file=sys.stderr)
+        exit(1)
+    else:
+        remote_onsite=args.onsite # The remote onsite dev to which we want to connect
+    
+
     logger.info('Connecting to onsite ' + remote_onsite)
     unavail_onsite_msg = 'Could not connect to ' + remote_onsite + '. It is not connected (yet). Waiting'
     while True:
