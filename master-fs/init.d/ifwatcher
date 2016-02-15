@@ -13,13 +13,13 @@
 #                    run a DHCP service on them
 ### END INIT INFO
 
-DAEMON="master-secondary-if-watcher.py"
+DAEMON="/usr/local/sbin/master-secondary-if-watcher.py"	# This PATH must be absolute
 daemon_OPT=""
 DAEMONUSER="root"
 daemon_NAME="ifwatcher"
 PIDFILE='/var/run/master-secondary-if-watcher.pid'
 
-PATH="/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin/"
+PATH="/sbin:/bin:/usr/sbin:/usr/bin"
 
 test -x $DAEMON || exit 0
 
