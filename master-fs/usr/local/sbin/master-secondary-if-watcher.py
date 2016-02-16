@@ -202,15 +202,16 @@ class DhcpService:
             raise Exception('InvalidDHCPRange')
         
 class InterfaceHandler:
-    def __init__(self, ifname, watcher):
+    def __init__(self, ifname, watcher, if_dump_filename = None):
         self.ifname = ifname
         self.parent_watcher = watcher
         self.link = False
         self.dnsmasq_pid_file = '/var/run/secondary-if-dnsmasq.' + ifname + '.pid'
         self.dnsmasq_proc = None
         self.dhcp_subnet = None
+        self.if_dump_filename = if_dump_filename
         if logger: logger.debug('Discovered new interface ' + ifname)
-        
+    
     def set_link_up(self):
         if not self.link:
             self.link = True
@@ -220,12 +221,17 @@ class InterfaceHandler:
                 if logger: logger.debug('Using IP address ' + str(self.dhcp_subnet.ip_addr) + ' on interface ' + self.ifname)
                 cmd = ['ifconfig', self.ifname, str(self.dhcp_subnet.ip_addr), 'netmask', str(self.dhcp_subnet.ip_netmask)]
                 subprocess.check_call(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
+                try:
+                    with open(self.if_dump_filename, 'w+') as f:
+                        f.write(self.ifname + '\n')
+                except OSError:
+                    pass # Ignore any error while removing the if dump file
                 if logger: logger.debug('Distributing range ' + str(self.dhcp_subnet.dhcp_range_start) + '-' + str(self.dhcp_subnet.dhcp_range_end) + ' (' + str(self.dhcp_subnet.dhcp_range_size) + ' IP addresses) on interface ' + self.ifname)
                 cmd = ['dnsmasq', '-i', self.ifname, '-u', 'dnsmasq', '-k', '--leasefile-ro', '--dhcp-range=interface:' + self.ifname + ',' + str(self.dhcp_subnet.dhcp_range_start) + ',' + str(self.dhcp_subnet.dhcp_range_end) + ',30', '--port=0', '--dhcp-authoritative', '--log-dhcp', '-x', self.dnsmasq_pid_file]
                 self.dnsmasq_proc = subprocess.Popen(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
             except DhcpRangeAllocationError:
                 raise
-        
+    
     def set_link_down(self):
         if self.link:
             if logger: logger.info('Link is going down for ' + self.ifname)
@@ -243,6 +249,11 @@ class InterfaceHandler:
             if self.dhcp_subnet is not None:
                 self.parent_watcher.release_ip_subnet(self.dhcp_subnet)
         
+        try:
+            os.unlink(self.if_dump_filename)
+        except OSError:
+            pass # Ignore any error while removing the if dump file
+        
         self.link =  False
         
     def destroy(self):
@@ -253,11 +264,12 @@ class DhcpRangeAllocationError(Exception):
     pass
 
 class InterfacesWatcher:
-    def __init__(self, ip_addr, ip_prefix):
+    def __init__(self, ip_addr, ip_prefix, if_dump_filename = None):
         self.ip_addr = ip_addr
         self.ip_prefix = ip_prefix
         self._secondary_if_dict = {}
         self._ip_subnet_allocated = None
+        self.if_dump_filename = if_dump_filename
         
     def if_link_up(self, ifname):
         if_handler = None
@@ -265,7 +277,7 @@ class InterfacesWatcher:
             if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
         except KeyError:
             #~ print('Creating handler for interface ' + ifname)
-            self._secondary_if_dict[ifname] = InterfaceHandler(ifname, self)
+            self._secondary_if_dict[ifname] = InterfaceHandler(ifname, self, self.if_dump_filename)
             if_handler = self._secondary_if_dict[ifname]
         if_handler.set_link_up()
         
@@ -275,7 +287,7 @@ class InterfacesWatcher:
             if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
         except KeyError:
             #~ print('Creating handler for interface ' + ifname)
-            self._secondary_if_dict[ifname] = InterfaceHandler(ifname, self)
+            self._secondary_if_dict[ifname] = InterfaceHandler(ifname, self, self.if_dump_filename)
             if_handler = self._secondary_if_dict[ifname]
         if_handler.set_link_down()
     
@@ -301,6 +313,8 @@ class InterfacesWatcher:
             self._ip_subnet_allocated = None
 
 if __name__ == '__main__':
+    EXTREMITY_IF_FILENAME = '/var/run/extremity_if'
+    
     # Parse arguments
 
     parser = argparse.ArgumentParser(description="This program watches all network interfaces for removable USB to Ethernet adapters. \
@@ -347,5 +361,5 @@ When it finds one, it automatically sets it up and distributres IP addresses on 
         logger.error('Invalid IP address or netmask: ' + args.ip_addr)
         raise Exception('InvalidIPParams')
     
-    ifW = InterfacesWatcher(ip_addr, ip_prefix)
+    ifW = InterfacesWatcher(ip_addr, ip_prefix, if_dump_filename=EXTREMITY_IF_FILENAME) # Start watching, dump the new interfaces activated into file EXTREMITY_IF_FILENAME (for masterdev_script to use)
     process_secondary_if_events(ifW.if_link_up, ifW.if_link_down, ifW.if_destroyed) # Run main loop
