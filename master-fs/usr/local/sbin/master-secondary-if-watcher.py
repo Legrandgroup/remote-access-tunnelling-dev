@@ -393,7 +393,7 @@ When it finds one, it automatically sets it up and distributres IP addresses on 
     if args.debug:
         handler = logging.StreamHandler()
     else:
-        handler = loggin.handlers.WatchedFileHandler('/var/log' + progname + '.log')
+        handler = logging.handlers.WatchedFileHandler('/var/log' + progname + '.log')
     
     handler.setFormatter(logging.Formatter("%(levelname)s %(asctime)s %(name)s:%(lineno)d %(message)s"))
     logger.addHandler(handler)
