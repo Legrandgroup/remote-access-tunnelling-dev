@@ -370,13 +370,12 @@ class SecondaryIfWatcherDBusService(dbus.service.Object):
 if __name__ == '__main__':
     EXTREMITY_IF_FILENAME = '/var/run/extremity_if'
     
-    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True) # Use Glib's mainloop as the default loop for all subsequent code
-    
     # Parse arguments
 
     parser = argparse.ArgumentParser(description="This program watches all network interfaces for removable USB to Ethernet adapters. \
 When it finds one, it automatically sets it up and distributres IP addresses on this interface.", prog=progname)
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
+    parser.add_argument('-D', '--dbus-responder', action='store_true', dest='dbus_responder', help='enable the D-Bus responder', default=False)
     parser.add_argument('-I', '--ip-addr', dest='ip_addr', type=str, help='Use the specified IP address and prefix for the USB interface in the CIDR notation', default='192.168.38.225/29')
     
     args = parser.parse_args()
@@ -420,22 +419,25 @@ When it finds one, it automatically sets it up and distributres IP addresses on 
     
     ifW = InterfacesWatcher(ip_addr, ip_prefix, if_dump_filename=EXTREMITY_IF_FILENAME) # Start watching, dump the new interfaces activated into file EXTREMITY_IF_FILENAME (for masterdev_script to use)
     
-    # Prepare D-Bus environment
-    system_bus = dbus.SystemBus(private=True)
-    
-    logger.debug('Going to register D-Bus listener')
-    name = dbus.service.BusName(SecondaryIfWatcherDBusService.DBUS_NAME, system_bus) # Publish the name to the D-Bus so that clients can see us
-    
-    # Allow secondary threads to run during the mainloop
-    gobject.threads_init() # Allow the mainloop to run as an independent thread
-    dbus.mainloop.glib.threads_init()
-    
-    dbus_loop = gobject.MainLoop()
-    
-    # Run the D-Bus thread
-    ifwatcher_dbus_handler = SecondaryIfWatcherDBusService(conn=system_bus, dbus_loop=dbus_loop, interface_watcher=ifW)
-    dbus_loop_thread = threading.Thread(target=dbus_loop.run)
-    dbus_loop_thread.setDaemon(True)	# dbus loop should be forced to terminate when main program exits
-    dbus_loop_thread.start()
+    if args.dbus_responder:
+        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True) # Use Glib's mainloop as the default loop for all subsequent code
+        
+        # Prepare D-Bus environment
+        system_bus = dbus.SystemBus(private=True)
+        
+        logger.debug('Going to register D-Bus listener')
+        name = dbus.service.BusName(SecondaryIfWatcherDBusService.DBUS_NAME, system_bus) # Publish the name to the D-Bus so that clients can see us
+        
+        # Allow secondary threads to run during the mainloop
+        gobject.threads_init() # Allow the mainloop to run as an independent thread
+        dbus.mainloop.glib.threads_init()
+        
+        dbus_loop = gobject.MainLoop()
+        
+        # Run the D-Bus thread
+        ifwatcher_dbus_handler = SecondaryIfWatcherDBusService(conn=system_bus, dbus_loop=dbus_loop, interface_watcher=ifW)
+        dbus_loop_thread = threading.Thread(target=dbus_loop.run)
+        dbus_loop_thread.setDaemon(True)	# dbus loop should be forced to terminate when main program exits
+        dbus_loop_thread.start()
     
     process_secondary_if_events(ifW.if_link_up, ifW.if_link_down, ifW.if_destroyed) # Run main loop
