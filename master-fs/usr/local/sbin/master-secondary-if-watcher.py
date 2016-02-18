@@ -15,12 +15,21 @@ import argparse
 
 import re
 
+import threading
+
+import gobject
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+
 import logging
 import logging.handlers
 
 import subprocess
 
 progname = os.path.basename(sys.argv[0])
+
+ifW = None	# Global interface watcher object (used for cleanup)
 
 logger = None
 
@@ -90,6 +99,18 @@ int main (int arvc, char *argv[]) {
 	return 0;
 }
 """
+
+def cleanup_at_exit():
+    """
+    Called when this program is terminated, to release the lock
+    """
+    
+    global ifW
+    
+    if ifW:
+        if not logger is None:
+            logger.info('Cleaning up at exit')
+    # TODO: perform all cleanup (DHCP server, ifconfig)
 
 def is_secondary_usb_if(ifname):
     
@@ -311,9 +332,45 @@ class InterfacesWatcher:
             raise Exception('UnknownSubnet')
         else:
             self._ip_subnet_allocated = None
+            
+    def get_last_ifname(self):
+        return 'eth1'	#FIXME: return the right value, not this hardcoded dummy response
 
+class SecondaryIfWatcherDBusService(dbus.service.Object):
+    """ D-Bus requests responder
+    """
+    
+    DBUS_NAME = 'com.legrandelectric.RemoteAccess.SecondaryIfWatcher'	# The name of bus we are creating in D-Bus
+    DBUS_OBJECT_ROOT = '/com/legrandelectric/RemoteAccess/SecondaryIfWatcher'	# The D-Bus object on which we will commnunicate 
+    DBUS_SERVICE_INTERFACE = 'com.legrandelectric.RemoteAccess.SecondaryIfWatcher'	# The name of the D-Bus service under which we will perform input/output on D-Bus
+
+    def __init__(self, interface_watcher, conn, dbus_object_path = DBUS_OBJECT_ROOT, **kwargs):
+        """ Instanciate a new SecondaryIfWatcherDBusService object handling responses to D-Bus
+        \param conn A D-Bus connection object
+        \param dbus_loop A main loop to use to process D-Bus request/signals
+        \param dbus_object_path The path of the object to handle on D-Bus
+        """
+        # Note: **kwargs is here to make this contructor more generic (it will however force args to be named, but this is anyway good practice) and is a step towards efficient mutliple-inheritance with Python new-style-classes
+        dbus.service.Object.__init__(self, conn=conn, object_path=dbus_object_path)
+        self.interface_watcher = interface_watcher
+        logger.debug('Registered binding with D-Bus object PATH: ' + str(dbus_object_path))
+    
+    # D-Bus-related methods
+    @dbus.service.method(dbus_interface = DBUS_SERVICE_INTERFACE, in_signature='', out_signature='s')
+    def GetInterface(self):
+        """ Get the currently active secondary interface for this master device
+        \return The name of the current secondary network interface (USB to Ethernet dongle) or '' if None
+        """
+        ifname = self.interface_watcher.get_last_ifname()
+        if ifname is None:
+            ifname = ''
+        logger.debug('Replying ' + ifname + ' to D-Bus request GetInterface')
+        return ifname
+        
 if __name__ == '__main__':
     EXTREMITY_IF_FILENAME = '/var/run/extremity_if'
+    
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True) # Use Glib's mainloop as the default loop for all subsequent code
     
     # Parse arguments
 
@@ -362,4 +419,23 @@ When it finds one, it automatically sets it up and distributres IP addresses on 
         raise Exception('InvalidIPParams')
     
     ifW = InterfacesWatcher(ip_addr, ip_prefix, if_dump_filename=EXTREMITY_IF_FILENAME) # Start watching, dump the new interfaces activated into file EXTREMITY_IF_FILENAME (for masterdev_script to use)
+    
+    # Prepare D-Bus environment
+    system_bus = dbus.SystemBus(private=True)
+    
+    logger.debug('Going to register D-Bus listener')
+    name = dbus.service.BusName(SecondaryIfWatcherDBusService.DBUS_NAME, system_bus) # Publish the name to the D-Bus so that clients can see us
+    
+    # Allow secondary threads to run during the mainloop
+    gobject.threads_init() # Allow the mainloop to run as an independent thread
+    dbus.mainloop.glib.threads_init()
+    
+    dbus_loop = gobject.MainLoop()
+    
+    # Run the D-Bus thread
+    ifwatcher_dbus_handler = SecondaryIfWatcherDBusService(conn=system_bus, dbus_loop=dbus_loop, interface_watcher=ifW)
+    dbus_loop_thread = threading.Thread(target=dbus_loop.run)
+    dbus_loop_thread.setDaemon(True)	# dbus loop should be forced to terminate when main program exits
+    dbus_loop_thread.start()
+    
     process_secondary_if_events(ifW.if_link_up, ifW.if_link_down, ifW.if_destroyed) # Run main loop
