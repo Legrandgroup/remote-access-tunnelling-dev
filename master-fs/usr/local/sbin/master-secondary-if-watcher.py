@@ -288,38 +288,33 @@ class InterfacesWatcher:
     def __init__(self, ip_addr, ip_prefix, if_dump_filename = None):
         self.ip_addr = ip_addr
         self.ip_prefix = ip_prefix
-        self._secondary_if_dict = {}
+        self._secondary_if = None
         self._ip_subnet_allocated = None
         self.if_dump_filename = if_dump_filename
-        
-    def if_link_up(self, ifname):
-        if_handler = None
-        try:
-            if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
-        except KeyError:
+    
+    def set_active_if(ifname):
+        if self._secondary_if is not None:
+            if self._secondary_if.ifname != ifname: # This interface is a different one from the previous active one
+                self._secondary_if.destroy()
+                self._secondary_if = None
+        if self._secondary_if is None:
             #~ print('Creating handler for interface ' + ifname)
-            self._secondary_if_dict[ifname] = InterfaceHandler(ifname, self, self.if_dump_filename)
-            if_handler = self._secondary_if_dict[ifname]
-        if_handler.set_link_up()
+            self._secondary_if = InterfaceHandler(ifname, self, self.if_dump_filename)
+
+    def if_link_up(self, ifname):
+        self.set_active_if(ifname)
+        self._secondary_if.set_link_up()
         
     def if_link_down(self, ifname):
-        if_handler = None
-        try:
-            if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
-        except KeyError:
-            #~ print('Creating handler for interface ' + ifname)
-            self._secondary_if_dict[ifname] = InterfaceHandler(ifname, self, self.if_dump_filename)
-            if_handler = self._secondary_if_dict[ifname]
-        if_handler.set_link_down()
+        self.set_active_if(ifname)
+        self._secondary_if.set_link_down()
     
     def if_destroyed(self, ifname):
-        try:
-            if_handler = self._secondary_if_dict[ifname] # Check if this interface is already known
-            if_handler.destroy()
-            del self._secondary_if_dict[ifname]
-        except KeyError:
-            pass
-            
+        if self._secondary_if is not None:
+            if self._secondary_if.ifname == ifname: # This interface is a different one from the previous active one
+                self._secondary_if.destroy()
+                self._secondary_if = None
+    
     def allocate_ip_subnet(self):
         if self._ip_subnet_allocated:
             raise DhcpRangeAllocationError('DualSecondarySubnetNotSupported')
@@ -334,7 +329,10 @@ class InterfacesWatcher:
             self._ip_subnet_allocated = None
             
     def get_last_ifname(self):
-        return 'eth1'	#FIXME: return the right value, not this hardcoded dummy response
+        if self._secondary_if is None:
+            return ''
+        else:
+            return self._secondary_if.ifname
 
 class SecondaryIfWatcherDBusService(dbus.service.Object):
     """ D-Bus requests responder
@@ -364,7 +362,7 @@ class SecondaryIfWatcherDBusService(dbus.service.Object):
         ifname = self.interface_watcher.get_last_ifname()
         if ifname is None:
             ifname = ''
-        logger.debug('Replying ' + ifname + ' to D-Bus request GetInterface')
+        logger.debug('Replying "' + ifname + '" to D-Bus request GetInterface')
         return ifname
         
 if __name__ == '__main__':
