@@ -5,9 +5,9 @@ if test x`id -u` != x0; then
   exit 1
 fi
 
-echo "Please confirm you want to install all scripts to transform this platform as a master by typing Y"
+echo "Please confirm you want to install all scripts to transform this platform as a master by typing 'master'"
 read var || exit 1
-if test x"$var" != x"Y"; then
+if test x"$var" != x"master"; then
   echo "Aborting" >&2
   exit 1
 fi
