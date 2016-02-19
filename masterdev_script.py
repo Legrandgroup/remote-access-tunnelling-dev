@@ -57,6 +57,12 @@ class MasterDev(tundev_script.TunnellingDev):
             logger.warning('Failure while parsing result from show_online_onsite_devs')
             return []    # Ignore the exception, return an empty array
 
+    def get_remote_onsite_ip_config(self):
+        """ Run the command show_remote_onsite_ip_config on the remote tundev shell and display the remote onsite IP's config
+        \return The IP configuration for the remote onsite we are currently connected to
+        """
+        return self._strip_trailing_cr_from(self.run_command('show_remote_onsite_ip_config', 4))
+    
     def run_connect_to_onsite_dev(self, id):
         """ Run the command connect_to_onsite_dev on the remote tundev shell, using \p id as the target onsite dev 
         \param id The ID of the remote onsite dev we want to connect to
@@ -245,6 +251,9 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         time.sleep(args.session_time)
     else:
         print('Remote session to onsite ' + remote_onsite + ' is now established')
+        remote_onsite_ip_config = master_dev.get_remote_onsite_ip_config()
+        if remote_onsite_ip_config:
+            print('Remote onsite has it LAN interface configured with IP address ' + remote_onsite_ip_config)
         #We prepare 3 events to be set in order to have a better idea of what failed
         event_ssh_down = threading.Event()
         event_ssh_down.clear()
