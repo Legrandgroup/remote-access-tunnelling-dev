@@ -124,8 +124,8 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     
     # Prepare a threading event to be set when the session drops. Setting this event will terminate this script
-    event_down = threading.Event()
-    event_down.clear()
+    termination_event = threading.Event()
+    termination_event.clear()
     
     #Updating tunnel mode according to masterdev tunnel mode
     tunnel_mode = onsite_dev.run_get_tunnel_mode()
@@ -181,7 +181,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         def signalHandler(signum, frame):
             logger.info('Handled signal ' + str(signum))
             event_signal_received.set()
-            event_down.set()
+            termination_event.set()
         
         #Thread to run to wait a process to end and then set the event
         class processWaiter(threading.Thread):
@@ -193,7 +193,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
             def run(self):
                 self._process.wait()
                 self.log_event.set()
-                event_down.set()
+                termination_event.set()
         
         #Create 2 of those thread : one for ssh and one for vtun client
         ssh_waiter = processWaiter(onsite_dev.get_ssh_process(), event_ssh_down)
@@ -208,9 +208,9 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         signal.signal(signal.SIGTERM, signalHandler)
         signal.signal(signal.SIGQUIT, signalHandler)
         #We wait for the event in block mode and therefore the session will last 'forever' if neither ssh nor vtun client falls down 
-        while not event_down.is_set():
+        while not termination_event.is_set():
             #onsite_dev.run_command('echo .')
-            event_down.wait(1) #Wait without timeout can't be interrupted by unix signal so we wait the signal with a 1 second timeout and we do that until the event is set.
+            termination_event.wait(1) #Wait without timeout can't be interrupted by unix signal so we wait the signal with a 1 second timeout and we do that until the event is set.
         #We disconnect signal from handler
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
