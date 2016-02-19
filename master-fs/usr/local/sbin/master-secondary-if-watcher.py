@@ -228,10 +228,11 @@ class DhcpService:
 class InterfaceHandler:
     """Class representing one secondary network interface
     """
-    def __init__(self, ifname, watcher, if_dump_filename = None, destroy_callback = None):
+    def __init__(self, ifname, watcher, if_dump_filename = None, deconfig_callback = None, config_callback = None):
         """\brief Generate an object representing a new secondary network interface
         \param ifname The network interface OS name (eg: 'eth1')
-        \param destroy_callback A function to run when this network interface is not usable anymore (it goes down, it is suppressed). This function will be invoked with the ifname as only argument
+        \param deconfig_callback A function to run when this network interface is not usable anymore (it goes down, it is suppressed). This function will be invoked with the ifname as only argument
+        \param config_callback A function to run when this network interface starts to be usable anymore (it goes up). This function will be invoked with the ifname as only argument
         """ 
         self.ifname = ifname
         self.parent_watcher = watcher
@@ -240,13 +241,14 @@ class InterfaceHandler:
         self.dnsmasq_proc = None
         self.dhcp_subnet = None
         self.if_dump_filename = if_dump_filename
-        self.destroy_callback = destroy_callback
+        self.config_callback = config_callback
+        self.deconfig_callback = deconfig_callback
         if logger: logger.debug('Discovered new interface ' + ifname)
     
     def set_link_up(self):
         if not self.link:
             try:
-                self.destroy_callback(self.ifname)
+                self.config_callback(self.ifname)
             except:
                 pass
             self.link = True
@@ -269,6 +271,10 @@ class InterfaceHandler:
     
     def set_link_down(self):
         if self.link:
+            try:
+                self.deconfig_callback(self.ifname)
+            except:
+                pass
             if logger: logger.info('Link is going down for ' + self.ifname)
             if self.dnsmasq_proc is not None:
                 if logger: logger.debug('Withdrawing all DHCP service configuration on interface ' + self.ifname)
@@ -311,7 +317,7 @@ class InterfacesWatcher:
         self.if_dump_filename = if_dump_filename
         self.interface_destroy_callback = None	# Callback invoked when current secondary interface is going down
     
-    def set_active_if(ifname):
+    def set_active_if(self, ifname):
         with self._secondary_if_mutex:
             if self._secondary_if is not None:
                 if self._secondary_if.ifname != ifname: # This interface is a different one from the previous active one
@@ -319,10 +325,10 @@ class InterfacesWatcher:
                     self._secondary_if = None
             if self._secondary_if is None:
                 #~ print('Creating handler for interface ' + ifname)
-                self._secondary_if = InterfaceHandler(ifname, self, self.if_dump_filename, destroy_callback=self.interface_destroy_callback)
-
+                self._secondary_if = InterfaceHandler(ifname, self, self.if_dump_filename, deconfig_callback=self.interface_destroy_callback)
+    
     def if_link_up(self, ifname):
-    	if logger: logger.debug('Interface ' + ifname + ' changed to status link up')
+        if logger: logger.debug('Interface ' + ifname + ' changed to status link up')
         self.set_active_if(ifname)
         with self._secondary_if_mutex:
             self._secondary_if.set_link_up()
