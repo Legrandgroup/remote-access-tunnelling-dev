@@ -223,7 +223,13 @@ class DhcpService:
             raise Exception('InvalidDHCPRange')
         
 class InterfaceHandler:
-    def __init__(self, ifname, watcher, if_dump_filename = None):
+    """Class representing one secondary network interface
+    """
+    def __init__(self, ifname, watcher, if_dump_filename = None, destroy_callback = None):
+        """\brief Generate an object representing a new secondary network interface
+        \param ifname The network interface OS name (eg: 'eth1')
+        \param destroy_callback A function to run when this network interface is not usable anymore (it goes down, it is suppressed). This function will be invoked with the ifname as only argument
+        """ 
         self.ifname = ifname
         self.parent_watcher = watcher
         self.link = False
@@ -231,10 +237,15 @@ class InterfaceHandler:
         self.dnsmasq_proc = None
         self.dhcp_subnet = None
         self.if_dump_filename = if_dump_filename
+        self.destroy_callback = destroy_callback
         if logger: logger.debug('Discovered new interface ' + ifname)
     
     def set_link_up(self):
         if not self.link:
+            try:
+                self.destroy_callback(self.ifname)
+            except:
+                pass
             self.link = True
             if logger: logger.info('Link is going up for ' + self.ifname)
             try:
@@ -277,6 +288,9 @@ class InterfaceHandler:
         
         self.link =  False
         
+    def is_configured(self):
+        return self.link
+        
     def destroy(self):
         if logger: logger.debug('Interface ' + self.ifname + ' is being destroyed... performing cleanup')
         self.set_link_down()
@@ -292,6 +306,7 @@ class InterfacesWatcher:
         self._secondary_if_mutex = threading.Lock()	# Mutex protecting reads/writes to self._secondary_if
         self._ip_subnet_allocated = None
         self.if_dump_filename = if_dump_filename
+        self.interface_destroy_callback = None	# Callback invoked when current secondary interface is going down
     
     def set_active_if(ifname):
         with self._secondary_if_mutex:
@@ -301,14 +316,16 @@ class InterfacesWatcher:
                     self._secondary_if = None
             if self._secondary_if is None:
                 #~ print('Creating handler for interface ' + ifname)
-                self._secondary_if = InterfaceHandler(ifname, self, self.if_dump_filename)
+                self._secondary_if = InterfaceHandler(ifname, self, self.if_dump_filename, destroy_callback=self.interface_destroy_callback)
 
     def if_link_up(self, ifname):
+    	if logger: logger.debug('Interface ' + ifname + ' changed to status link up')
         self.set_active_if(ifname)
         with self._secondary_if_mutex:
             self._secondary_if.set_link_up()
         
     def if_link_down(self, ifname):
+        if logger: logger.debug('Interface ' + ifname + ' changed to status link down')
         self.set_active_if(ifname)
         with self._secondary_if_mutex:
             self._secondary_if.set_link_down()
@@ -335,10 +352,10 @@ class InterfacesWatcher:
             
     def get_last_ifname(self):
         with self._secondary_if_mutex:
-            if self._secondary_if is None:
-                return ''
-            else:
+            if self._secondary_if is not None and self._secondary_if.is_configured():
                 return self._secondary_if.ifname
+            else:
+            	return ''
 
 class SecondaryIfWatcherDBusService(dbus.service.Object):
     """ D-Bus requests responder
@@ -357,6 +374,7 @@ class SecondaryIfWatcherDBusService(dbus.service.Object):
         # Note: **kwargs is here to make this contructor more generic (it will however force args to be named, but this is anyway good practice) and is a step towards efficient mutliple-inheritance with Python new-style-classes
         dbus.service.Object.__init__(self, conn=conn, object_path=dbus_object_path)
         self.interface_watcher = interface_watcher
+        interface_watcher.interface_destroy_callback = self.InterfaceRemoved	# Request interface_watcher object to call InterfaceRemoved (in order to send a D-Bus signal when secondary network interface is going down)
         logger.debug('Registered binding with D-Bus object PATH: ' + str(dbus_object_path))
     
     # D-Bus-related methods
@@ -370,6 +388,13 @@ class SecondaryIfWatcherDBusService(dbus.service.Object):
             ifname = ''
         logger.debug('Replying "' + ifname + '" to D-Bus request GetInterface')
         return ifname
+       
+    @dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
+    def InterfaceRemoved(self, interface_name):
+        """
+        D-Bus decorated method to send the "InterfaceRemoved" signal
+        """
+        pass
         
 if __name__ == '__main__':
     EXTREMITY_IF_FILENAME = '/var/run/extremity_if'
