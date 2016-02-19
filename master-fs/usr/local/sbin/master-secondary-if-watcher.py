@@ -102,18 +102,19 @@ int main (int arvc, char *argv[]) {
 }
 """
 
-def cleanup_at_exit():
-    """
-    Called when this program is terminated, to release the lock
-    """
-    
-    global ifW
-    
-    if ifW:
-        if logger: logger.info('Cleaning up at exit')
-        if ifW._secondary_if and ifW._secondary_if.ifname:
-            if logger: logger.debug('De-configuring interface ' + ifW._secondary_if.ifname)
-            ifW.if_destroyed(ifW._secondary_if.ifname)
+if __name__ == '__main__':
+    def cleanup_at_exit():
+        """
+        Called when this program is terminated, to release the lock
+        """
+        
+        global ifW
+        
+        if ifW:
+            if logger: logger.info('Cleaning up at exit')
+            if ifW._secondary_if and ifW._secondary_if.ifname:
+                if logger: logger.debug('De-configuring interface ' + ifW._secondary_if.ifname)
+                ifW.if_destroyed(ifW._secondary_if.ifname)
 
 def is_secondary_usb_if(ifname):
     
