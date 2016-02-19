@@ -26,4 +26,6 @@ fi
 cp -f ./master-fs/etc/init.d/ifwatcher /etc/init.d
 if test x"$IFWATCHER_RUNNING" != x"0"; then
   /etc/init.d/ifwatcher start
+else
+  update-rc.d ifwatcher defaults
 fi
