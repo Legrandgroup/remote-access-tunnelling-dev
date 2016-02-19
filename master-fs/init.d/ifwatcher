@@ -14,7 +14,7 @@
 ### END INIT INFO
 
 DAEMON="/usr/local/sbin/master-secondary-if-watcher.py"	# This PATH must be absolute
-daemon_OPT=""
+daemon_OPT="-D"
 DAEMONUSER="root"
 daemon_NAME="ifwatcher"
 PIDFILE='/var/run/master-secondary-if-watcher.pid'
