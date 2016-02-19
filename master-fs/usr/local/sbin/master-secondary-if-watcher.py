@@ -289,37 +289,42 @@ class InterfacesWatcher:
         self.ip_addr = ip_addr
         self.ip_prefix = ip_prefix
         self._secondary_if = None
+        self._secondary_if_mutex = threading.Lock()	# Mutex protecting reads/writes to self._secondary_if
         self._ip_subnet_allocated = None
         self.if_dump_filename = if_dump_filename
     
     def set_active_if(ifname):
-        if self._secondary_if is not None:
-            if self._secondary_if.ifname != ifname: # This interface is a different one from the previous active one
-                self._secondary_if.destroy()
-                self._secondary_if = None
-        if self._secondary_if is None:
-            #~ print('Creating handler for interface ' + ifname)
-            self._secondary_if = InterfaceHandler(ifname, self, self.if_dump_filename)
+        with self._secondary_if_mutex:
+            if self._secondary_if is not None:
+                if self._secondary_if.ifname != ifname: # This interface is a different one from the previous active one
+                    self._secondary_if.destroy()
+                    self._secondary_if = None
+            if self._secondary_if is None:
+                #~ print('Creating handler for interface ' + ifname)
+                self._secondary_if = InterfaceHandler(ifname, self, self.if_dump_filename)
 
     def if_link_up(self, ifname):
         self.set_active_if(ifname)
-        self._secondary_if.set_link_up()
+        with self._secondary_if_mutex:
+            self._secondary_if.set_link_up()
         
     def if_link_down(self, ifname):
         self.set_active_if(ifname)
-        self._secondary_if.set_link_down()
+        with self._secondary_if_mutex:
+            self._secondary_if.set_link_down()
     
     def if_destroyed(self, ifname):
         if self._secondary_if is not None:
             if self._secondary_if.ifname == ifname: # This interface is a different one from the previous active one
-                self._secondary_if.destroy()
-                self._secondary_if = None
+                with self._secondary_if_mutex:
+                    self._secondary_if.destroy()
+                    self._secondary_if = None
     
     def allocate_ip_subnet(self):
         if self._ip_subnet_allocated:
             raise DhcpRangeAllocationError('DualSecondarySubnetNotSupported')
         else:
-            self._ip_subnet_allocated = DhcpService(ip_addr=ip_addr, ip_prefix=ip_prefix)
+            self._ip_subnet_allocated = DhcpService(ip_addr=self.ip_addr, ip_prefix=self.ip_prefix)
             return self._ip_subnet_allocated
 
     def release_ip_subnet(self, ip_subnet):
@@ -329,10 +334,11 @@ class InterfacesWatcher:
             self._ip_subnet_allocated = None
             
     def get_last_ifname(self):
-        if self._secondary_if is None:
-            return ''
-        else:
-            return self._secondary_if.ifname
+        with self._secondary_if_mutex:
+            if self._secondary_if is None:
+                return ''
+            else:
+                return self._secondary_if.ifname
 
 class SecondaryIfWatcherDBusService(dbus.service.Object):
     """ D-Bus requests responder
