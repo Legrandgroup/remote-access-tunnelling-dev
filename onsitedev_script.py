@@ -122,6 +122,11 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         else:
             logger.warning('RDV server asked us to restart by sending us a wait_master_connection reply containing "reset"')
     
+    
+    # Prepare a threading event to be set when the session drops. Setting this event will terminate this script
+    event_down = threading.Event()
+    event_down.clear()
+    
     #Updating tunnel mode according to masterdev tunnel mode
     tunnel_mode = onsite_dev.run_get_tunnel_mode()
     
@@ -163,12 +168,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         print('Now sleeping ' + str(args.session_time/60) + ' min ' + str(args.session_time%60) + ' s')
         time.sleep(args.session_time)
     else:
-        print('vtund over ssh session now established')
-        
-        #We prepare an event to be set when either ssh or vtun client falls down
-        event_down = threading.Event()
-        event_down.clear()
-        
+        print('Session now established with remote master')
         #We prepare 3 events to be set in order to have a better idea of what failed
         event_ssh_down = threading.Event()
         event_ssh_down.clear()
@@ -210,7 +210,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         #We wait for the event in block mode and therefore the session will last 'forever' if neither ssh nor vtun client falls down 
         while not event_down.is_set():
             #onsite_dev.run_command('echo .')
-            event_down.wait(1) #Wait without timeout can't be interrupted by unix signal so we wait the signal with a 1 second timeout and we do that until the even is set.
+            event_down.wait(1) #Wait without timeout can't be interrupted by unix signal so we wait the signal with a 1 second timeout and we do that until the event is set.
         #We disconnect signal from handler
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
@@ -232,5 +232,5 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         session_output = session_output[:-1]
     while session_output.endswith('|\n'):   # Get rid of the last empty line(s) that is/are present most of the time
         session_output = session_output[:-2]
-    print('Now exitting tundev script. For debug, output from vtund client was:\n' + session_output , file=sys.stderr)
+    print('Now exitting tundev script. For debug, output from vtund client was:\n' + session_output, file=sys.stderr)
     onsite_dev.exit()
