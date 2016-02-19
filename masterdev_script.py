@@ -16,6 +16,11 @@ import time
 import threading
 import signal
 
+import gobject
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+
 progname = os.path.basename(sys.argv[0])
 
 class MasterDev(tundev_script.TunnellingDev):
@@ -66,6 +71,10 @@ class MasterDev(tundev_script.TunnellingDev):
         self.run_command('set_tunnel_mode ' + str(tunnel_mode), 2)
     
 if __name__ == '__main__':
+    DBUS_NAME = 'com.legrandelectric.RemoteAccess.SecondaryIfWatcher'	# The name of bus we are creating in D-Bus
+    DBUS_OBJECT_ROOT = '/com/legrandelectric/RemoteAccess/SecondaryIfWatcher'	# The D-Bus object on which we will commnunicate 
+    DBUS_SERVICE_INTERFACE = 'com.legrandelectric.RemoteAccess.SecondaryIfWatcher'	# The name of the D-Bus service under which we will perform input/output on D-Bus
+    
     # Parse arguments
     parser = argparse.ArgumentParser(description="This program automatically connects to a RDV server as a master device. \
 and automates the typing of tundev shell commands from the tunnelling devices side in order to setup a tunnel session", prog=progname)
@@ -126,7 +135,10 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     else:
         remote_onsite=args.onsite # The remote onsite dev to which we want to connect
     
-
+    # Prepare a threading event to be set when the session drops. Setting this event will terminate this script
+    event_down = threading.Event()
+    event_down.clear()
+    
     logger.info('Connecting to onsite ' + remote_onsite)
     unavail_onsite_msg = 'Could not connect to ' + remote_onsite + '. It is not connected (yet). Waiting'
     while True:
@@ -154,18 +166,49 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     tunnel_mode = master_dev.run_get_tunnel_mode()
     
     locally_redirected_vtun_server_port = 5000
-    extremity_if=None
+    
+    extremity_if = None
+    event_secondary_if_down = threading.Event()
+    event_secondary_if_down.clear()
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True) # Use Glib's mainloop as the default loop for all subsequent code
+    
     try:
-        with open('/var/run/extremity_if') as f:
-            extremity_if = f.readline(64).rstrip('\n')   # Try to read the extremity interface from the filesystem
-            logger.debug('Read extremity network interface ' + extremity_if + ' from /var/run/extremity_if')
-    except IOError:
-        pass
+        bus = dbus.SystemBus()
+        proxy = bus.get_object(DBUS_NAME, DBUS_OBJECT_ROOT)
+        extremity_if = proxy.GetInterface(dbus_interface=DBUS_SERVICE_INTERFACE)
+        logger.debug('Read extremity network interface ' + extremity_if + ' from D-Bus call')
+        # If we got a D-Bus extremity interface, carry on watching D-Bus signals for interface removal
+        def dBusInterfaceRemovedHandler(ifname, **kwargs):
+            logger.info('Received InterfaceRemoved D-Bus signal for interface ' + ifname)
+            if ifname == extremity_if:
+                event_secondary_if_down.set()
+                event_down.set()
+        
+        dbus_loop = gobject.MainLoop()
+        
+        # Allow secondary threads to run during the mainloop
+        gobject.threads_init() # Allow the mainloop to run as an independent thread
+        dbus.mainloop.glib.threads_init()
+        
+        # Run the D-Bus thread in background
+        dbus_loop_thread = threading.Thread(target=dbus_loop.run)
+        dbus_loop_thread.setDaemon(True)	# dbus loop should be forced to terminate when main program exits
+        dbus_loop_thread.start()
+        
+        proxy.connect_to_signal('InterfaceRemoved',
+                                dBusInterfaceRemovedHandler,
+                                dbus_interface=DBUS_SERVICE_INTERFACE,
+                                message_keyword='dbus_message') # Set a callback for the InterfaceRemoved D-Bus signal
+        
+    except dbus.DBusException:
+        import traceback
+        extremity_if = None
+        traceback.print_exc()   # Dump exception but continue anyway
     
     if extremity_if is None or extremity_if == '':
-        extermity_if='eth0'
+        extremity_if='eth0'
     
-    logger.debug('Going to setup vtun tunnel in mode ' + tunnel_mode + ' with extermity interface ' + extremity_if)
+    logger.debug('Going to setup vtun tunnel in mode ' + tunnel_mode + ' with extremity interface ' + extremity_if)
     vtun_client_config = master_dev.get_client_vtun_tunnel(tunnel_mode,
                                                            extremity_if=extremity_if,
                                                            vtun_server_hostname='127.0.0.1',
@@ -201,12 +244,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         print('Now sleeping ' + str(args.session_time/60) + ' min ' + str(args.session_time%60) + ' s')
         time.sleep(args.session_time)
     else:
-        print('vtund over ssh session now established')
-        
-        #We prepare and event to be set when either ssh or vtun client falls down
-        event_down = threading.Event()
-        event_down.clear()
-        
+        print('Remote session to onsite ' + remote_onsite + ' is now established')
         #We prepare 3 events to be set in order to have a better idea of what failed
         event_ssh_down = threading.Event()
         event_ssh_down.clear()
@@ -247,18 +285,20 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         signal.signal(signal.SIGQUIT, signalHandler)
         #We wait for the event in block mode and therefore the session will last 'forever' if neither ssh nor vtun client falls down 
         while not event_down.is_set():
-            event_down.wait(1) #Wait without timeout can't be interrupted by unix signal so we wait the signal with a 1 second timeout and we do that until the even is set.
+            event_down.wait(1) #Wait without timeout can't be interrupted by unix signal so we wait the signal with a 1 second timeout and we do that until the event is set.
         #We disconnect signal from handler
         signal.signal(signal.SIGINT, signal.SIG_DFL)
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
         signal.signal(signal.SIGQUIT, signal.SIG_DFL)
         
         if event_signal_received.is_set():
-            logger.info('Stopped by receiving signal')
+            logger.info('Stopped due to UNIX signal received')
         if event_ssh_down.is_set():
-            logger.error('Stopped by losing SSH Connection')
+            logger.error('Stopped due to a dropped SSH connection ')
         if event_vtun_down.is_set():
-            logger.error('Stopped by losing Vtun Tunnel')
+            logger.error('Stopped due to a dropped vtun tunnel')
+        if event_secondary_if_down.is_set():
+            logger.error('Stopped due to a de-configuration of secondary extremity interface')
     print('...done')
     vtun_client.stop()
     session_output = vtun_client.get_output()
@@ -267,5 +307,5 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         session_output = session_output[:-1]
     while session_output.endswith('|\n'):   # Get rid of the last empty line(s) that is/are present most of the time
         session_output = session_output[:-2]
-    print('Now exitting tundev script. For debug, output from vtund client was:\n' + session_output , file=sys.stderr)
+    print('Now exitting tundev script. For debug, output from vtund client was:\n' + session_output, file=sys.stderr)
     master_dev.exit()
