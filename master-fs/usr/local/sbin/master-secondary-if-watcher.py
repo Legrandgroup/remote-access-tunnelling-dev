@@ -27,6 +27,8 @@ import logging.handlers
 
 import subprocess
 
+import atexit
+
 progname = os.path.basename(sys.argv[0])
 
 ifW = None	# Global interface watcher object (used for cleanup)
@@ -108,9 +110,10 @@ def cleanup_at_exit():
     global ifW
     
     if ifW:
-        if not logger is None:
-            logger.info('Cleaning up at exit')
-    # TODO: perform all cleanup (DHCP server, ifconfig)
+        if logger: logger.info('Cleaning up at exit')
+        if ifW._secondary_if and ifW._secondary_if.ifname:
+            if logger: logger.debug('De-configuring interface ' + ifW._secondary_if.ifname)
+            ifW.if_destroyed(ifW._secondary_if.ifname)
 
 def is_secondary_usb_if(ifname):
     
@@ -446,6 +449,7 @@ When it finds one, it automatically sets it up and distributres IP addresses on 
         logger.error('Invalid IP address or netmask: ' + args.ip_addr)
         raise Exception('InvalidIPParams')
     
+    atexit.register(cleanup_at_exit)
     ifW = InterfacesWatcher(ip_addr, ip_prefix, if_dump_filename=EXTREMITY_IF_FILENAME) # Start watching, dump the new interfaces activated into file EXTREMITY_IF_FILENAME (for masterdev_script to use)
     
     if args.dbus_responder:
