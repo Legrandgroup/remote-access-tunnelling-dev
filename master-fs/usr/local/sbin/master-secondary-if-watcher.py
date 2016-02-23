@@ -29,6 +29,8 @@ import subprocess
 
 import atexit
 
+import glob
+
 progname = os.path.basename(sys.argv[0])
 
 ifW = None	# Global interface watcher object (used for cleanup)
@@ -116,6 +118,18 @@ if __name__ == '__main__':
                 if logger: logger.debug('De-configuring interface ' + ifW._secondary_if.ifname)
                 ifW.if_destroyed(ifW._secondary_if.ifname)
 
+def list_all_sys_net_if():
+    """
+    List the machine's network interfaces and return their name in a list of strings
+    \return A list of network interfaces (strings)
+    """
+    sys_net_path = glob.glob('/sys/class/net/*')
+    # Now remove the /sys/class/net prefix, keep only the interface name
+    p = re.compile('^/sys/class/net/')
+    result = [ p.sub('', s) for s in sys_net_path ]
+    
+    return result
+
 def is_secondary_usb_if(ifname):
     
     if ifname == 'eth0':    # Never accept eth0 as a secondary interface
@@ -134,13 +148,38 @@ def is_secondary_usb_if(ifname):
     
     return False
 
-"""
-\brief Waits until there is a new netlink event from the kernel and parse it
-\param socket The socket.AF_NETLINK socket (in socket.SOCK_RAW mode, with socket.NETLINK_ROUTE filtering)
-\return A tuple of 3 items: the first item is the message type (RTM_NEWLINK or RTM_DELLINK), the second is a boolean indicating if the physical carrier is up (or None if N/A), the third is the interface name as a string
-\note This function may raise exception if NLMSG_ERROR is received
-"""
+def is_if_up(ifname):
+    """
+    \brief Check a network interface's link status
+    \param ifname The network interface name
+    \return True if the network interface'link is up, False otherwise
+    """
+    with open('/sys/class/net/' + ifname + '/carrier', 'r') as f:
+            status = f.readline()
+            return (status == '1')
+
+def process_existing_secondary_if(on_link_up_callback, on_link_down_callback):
+    """
+    \brief Lists currently existing secondary interfaces and run a callback on each of them
+    \param on_link_up_callback Function to run on network interfaces with a link up
+    \param on_link_down_callback Function to run on network interfaces with a link down
+    """
+    # Fetch the secondary network interfaces
+    secondary_usb_ifs = filter(is_secondary_usb_if, list_all_sys_net_if())
+    logger.debug('Secondary network interfaces detected at startup: ' +  str(secondary_usb_ifs))
+    for net_if in secondary_usb_ifs:
+        if is_if_up(net_if):
+            on_link_up_callback(str(net_if))
+        else:
+            on_link_down_callback(str(net_if))
+
 def get_next_netlink_event(socket):
+    """
+    \brief Waits until there is a new netlink event from the kernel and parse it
+    \param socket The socket.AF_NETLINK socket (in socket.SOCK_RAW mode, with socket.NETLINK_ROUTE filtering)
+    \return A tuple of 3 items: the first item is the message type (RTM_NEWLINK or RTM_DELLINK), the second is a boolean indicating if the physical carrier is up (or None if N/A), the third is the interface name as a string
+    \note This function may raise exception if NLMSG_ERROR is received
+    """
     
     while True:
         data = socket.recv(65535)
@@ -193,6 +232,12 @@ def get_next_netlink_event(socket):
                 return (msg_type, l1_link, rta_data)
 
 def process_secondary_if_events(on_link_up_callback, on_link_down_callback, on_destroy_callback):
+    """
+    \brief Watches creation/destruction events on secondary network interfaces (using Linux netlink) interfaces and run a callback for each event
+    \param on_link_up_callback Function to run on network interfaces with a link up
+    \param on_link_down_callback Function to run on network interfaces with a link down
+    \param on_destroy_callback Function to run on network interfaces that are being destroyed
+    """
     # Create the netlink socket and bind to RTMGRP_LINK,
     s = socket.socket(socket.AF_NETLINK, socket.SOCK_RAW, socket.NETLINK_ROUTE)
     s.bind((os.getpid(), RTMGRP_LINK))
@@ -480,4 +525,5 @@ When it finds one, it automatically sets it up and distributres IP addresses on 
         dbus_loop_thread.setDaemon(True)	# dbus loop should be forced to terminate when main program exits
         dbus_loop_thread.start()
     
+    process_existing_secondary_if(ifW.if_link_up, ifW.if_link_down) # Discover interfaces that already exist
     process_secondary_if_events(ifW.if_link_up, ifW.if_link_down, ifW.if_destroyed) # Run main loop
