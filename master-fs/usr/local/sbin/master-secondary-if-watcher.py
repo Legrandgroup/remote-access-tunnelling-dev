@@ -362,6 +362,7 @@ class InterfacesWatcher:
         self._ip_subnet_allocated = None
         self.if_dump_filename = if_dump_filename
         self.interface_destroy_callback = None	# Callback invoked when current secondary interface is going down
+        self.interface_add_callback = None	# Callback invoked when a new secondary interface is going up
     
     def set_active_if(self, ifname):
         with self._secondary_if_mutex:
@@ -371,7 +372,7 @@ class InterfacesWatcher:
                     self._secondary_if = None
             if self._secondary_if is None:
                 #~ print('Creating handler for interface ' + ifname)
-                self._secondary_if = InterfaceHandler(ifname, self, self.if_dump_filename, deconfig_callback=self.interface_destroy_callback)
+                self._secondary_if = InterfaceHandler(ifname, self, self.if_dump_filename, deconfig_callback=self.interface_destroy_callback, config_callback=self.interface_add_callback)
     
     def if_link_up(self, ifname):
         if logger: logger.debug('Interface ' + ifname + ' changed to status link up')
@@ -410,7 +411,7 @@ class InterfacesWatcher:
             if self._secondary_if is not None and self._secondary_if.is_configured():
                 return self._secondary_if.ifname
             else:
-            	return ''
+                return ''
 
 class SecondaryIfWatcherDBusService(dbus.service.Object):
     """ D-Bus requests responder
@@ -430,6 +431,7 @@ class SecondaryIfWatcherDBusService(dbus.service.Object):
         dbus.service.Object.__init__(self, conn=conn, object_path=dbus_object_path)
         self.interface_watcher = interface_watcher
         interface_watcher.interface_destroy_callback = self.InterfaceRemoved	# Request interface_watcher object to call InterfaceRemoved (in order to send a D-Bus signal when secondary network interface is going down)
+        interface_watcher.interface_add_callback = self.InterfaceAdded	# Request interface_watcher object to call InterfaceAdded (in order to send a D-Bus signal when secondary network interface is going up)
         logger.debug('Registered binding with D-Bus object PATH: ' + str(dbus_object_path))
     
     # D-Bus-related methods
@@ -450,7 +452,14 @@ class SecondaryIfWatcherDBusService(dbus.service.Object):
         D-Bus decorated method to send the "InterfaceRemoved" signal
         """
         pass
-        
+    
+    @dbus.service.signal(dbus_interface = DBUS_SERVICE_INTERFACE)
+    def InterfaceAdded(self, interface_name):
+        """
+        D-Bus decorated method to send the "InterfaceAdded" signal
+        """
+        pass
+
 if __name__ == '__main__':
     EXTREMITY_IF_FILENAME = '/var/run/extremity_if'
     
