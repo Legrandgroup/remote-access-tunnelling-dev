@@ -443,7 +443,7 @@ class TunnellingDev(object):
         """ Class representing a tunnelling device configuration as provided by the remote tundev shell command get_vtun_parameters
         This class is just a container around a python dict, with one method allowing to generate a pythonvtunlib.client_vtun_tunnel based on the parameters contained in the self.dict attribute  
         """
-        def __init__(self, config_dict, tunnel_mode, tunnel_name, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtund_use_sudo = False, vtun_connection_timeout = 20):
+        def __init__(self, config_dict, tunnel_mode, tunnel_name, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtund_use_sudo = False, ping_use_sudo = False, vtun_connection_timeout = 20):
             """ Constructor
             \param dict A python dict to encapsulate into this object
             \param tunnel_mode The tunnel mode ('L2', 'L3' etc...)
@@ -452,6 +452,7 @@ class TunnellingDev(object):
             \param vtun_server_port The TCP port to use when connecting to the vtund server  
             \param vtund_exec (optional) The PATH to the vtund binary
             \param vtund_use_sudo (optional) A boolean indicating whether the vtund_exec needs to be run via sudo to get root access (False by default)
+            \param ping_use_sudo (optional) A boolean indicating whether ping needs to be run via sudo (False by default)
             \param vtun_connection_timeout How many seconds we give for the tunnel establishment (20 by default)
             """
             self.config_dict = config_dict
@@ -461,6 +462,7 @@ class TunnellingDev(object):
             self.vtun_server_port = vtun_server_port
             self.vtund_exec = vtund_exec
             self.vtund_use_sudo = vtund_use_sudo
+            self.ping_use_sudo = ping_use_sudo
             self.vtun_connection_timeout = vtun_connection_timeout
         
         def to_client_vtun_tunnel_object(self):
@@ -530,6 +532,8 @@ class TunnellingDev(object):
                 ping_success = False
                 while attempts > 0:
                     cmd = ['ping', '-c' , '1', '-w', '1', str(self.config_dict['rdv_server_ip_address'])] # Send 1 ping and give it 1s to answer
+                    if self.ping_use_sudo:
+                        cmd = ['sudo'] + cmd
                     rc = subprocess.call(cmd, stdout=open(os.devnull, 'wb'), stderr=subprocess.STDOUT)
                     if rc == 0:
                         ping_success = True
@@ -554,7 +558,7 @@ class TunnellingDev(object):
             config_dict[key]=value
         return config_dict
     
-    def get_client_vtun_tunnel(self, tunnel_mode, extremity_if, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtund_use_sudo = False, vtun_connection_timeout = 20, nat_to_external = False):
+    def get_client_vtun_tunnel(self, tunnel_mode, extremity_if, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtund_use_sudo = False, ping_use_sudo = False, vtun_connection_timeout = 20, nat_to_external = False):
         """ Create a pythonvtunlib.client_vtun_tunnel object based on the configuration returned by the devshell command get_vtun_parameters
         
         If the vtun_parameters_dict provided by the internal call to self._get_vtun_parameters_as_dict() does not have (enough) information to build a client tunnel, an exception will be raised
@@ -564,6 +568,7 @@ class TunnellingDev(object):
         \param vtun_server_port The TCP port to use when connecting to the vtund server  
         \param vtund_exec (optional) The PATH to the vtund binary
         \param vtund_use_sudo (optional) A boolean indicating whether the vtund_exec needs to be run via sudo to get root access (False by default)
+        \param ping_use_sudo (optional) A boolean indicating whether ping needs to be run via sudo (False by default)
         \param vtun_connection_timeout How many seconds we give for the tunnel establishment (20 by default)
         \param nat_to_external (default False) Do we also add a NAT rule to take the paternity of all traffic incoming from the tunnel? This is used only by onsite clients, and will only be applied in L2 mode
         \return The resulting ClientVtunTunnelConfig object
@@ -588,6 +593,7 @@ class TunnellingDev(object):
                                                     vtun_server_port=vtun_server_port,
                                                     vtund_exec=vtund_exec,
                                                     vtund_use_sudo=vtund_use_sudo,
+                                                    ping_use_sudo=ping_use_sudo,
                                                     vtun_connection_timeout=vtun_connection_timeout)
     def get_ssh_process(self):
         if self._exp is None:
