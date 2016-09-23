@@ -394,7 +394,7 @@ class TunnellingDev(object):
         """ Send the IP addressing for the interface iface to the remote tundev shell
         \param iface The network interface for which we will extract the IP address
         """
-        self.run_set_tunnelling_dev_lan_ip_address(self._get_ip_network())
+        self.run_set_tunnelling_dev_lan_ip_address(self._get_ip_network(iface=iface))
     
     def run_set_tunnelling_dev_dns_server_list(self, dns_list):
         """ Run the command run_set_tunnelling_dev_dns_server_list on the remote tundev shell
