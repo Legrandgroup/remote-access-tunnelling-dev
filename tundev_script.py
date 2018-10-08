@@ -27,7 +27,7 @@ class TunnellingDev(object):
     A tunnelling device is a abstract device gathering client devices or server devices
     """
     
-    PROTO_RDV_SERVER = '88.170.42.228'	# Note: changing this will only affect behaviour in direct (no -T) mode, for SSL tunnelled mode (-T), the IP address of the RDV server is configured in stunnel's config files
+    PROTO_RDV_SERVER = '88.122.24.249'	# Note: changing this will only affect behaviour in direct (no -T) mode, for SSL tunnelled mode (-T), the IP address of the RDV server is configured in stunnel's config files
     SSH_ESCAPE_SHELL_PROMPT = 'ssh> '
                 
     def __init__(self, username, logger, rdv_server = PROTO_RDV_SERVER, key_filename = None, prompt = None):
