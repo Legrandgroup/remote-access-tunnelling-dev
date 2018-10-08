@@ -52,6 +52,7 @@ class MasterDev(tundev_script.TunnellingDev):
             if online_onsite_dev_str == '':
                 return []
             list = online_onsite_dev_str.split('\n')
+            list = map(lambda x: x.rstrip('\r'),list)	# Remove trailing \r from every string in the list
             return list
         except:
             logger.warning('Failure while parsing result from show_online_onsite_devs')
