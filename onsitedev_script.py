@@ -137,7 +137,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
                                                            extremity_if='eth0',
                                                            vtun_server_hostname='127.0.0.1',
                                                            vtun_server_port=locally_redirected_vtun_server_port,
-                                                           vtund_exec='/usr/local/sbin/vtund',
+                                                           vtund_exec='/usr/sbin/vtund',
                                                            vtund_use_sudo=True,
                                                            nat_to_external=(tunnel_mode == 'L3')   # Always use a NAT towards the LAN for onsite devices in L2 mode
                                                           )  # Returns a pythonvtunlib.client_vtun_tunnel object
