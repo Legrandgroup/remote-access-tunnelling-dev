@@ -1,3 +1,40 @@
 This repository contains the scripts used on tunnelling devices (client or support devices), it is part of the remote access project.
 For more information about the remote access project, please consult the Confluence page:
 https://www.bwiki.bticino.it:8443/display/PRJACCESDISTANT/
+
+
+
+The section below lists outstanding issues/features on this code:
+- Handle tunnel-related processus cleanup (vtun) on the client side
+  We could use the flock concept on a file lock grabbed by *_script.py processes.
+  We would thus run a third Python (or shell) process, which, once the flock released, would verify that the vtun client has really been terminated.
+  This could be implemented as a python library (in order to re-use this feature in the RDV server's watchdog)
+
+- Add a GUI (web) to allow controlling connection/disconnection bu the user
+  When a web browser is opened on the masterdev's terminal, and provided the RPI's IP address as URL, a simple control interface is displayed.
+  This interface shows: Status (uptime) List all connected onsite RPIs Select one onsite RPI and connect to it (this can thus fully replace the command-line version of the master)
+
+- Add a mechanism to switch between routed and bridged modes
+
+- Support 3G uplinks (automatic switchover between all uplink modes) on onsite devs
+
+- Support Wi-Fi uplinks (automatic switchover between all uplinks modes) on onsite devs
+
+- Support LORA, Sigfox or NB-IoT hartbeats that onside devs send to the RDV server, so that we know they are alive even if connection is lost. Maybe add some diagnostics on uplink failure in heartbeat.
+
+- Provide the DNS name or IP address of the RDV sever as an argument of scripts *dev_script.py
+  Can easily be done using the rdv_server argument of OnsiteDev and MasterDev classes' constructors
+  Works on direct SSH but much more difficult when using stunnel (tunnelled SSL 443 links) because the RDV server's IP address is then in stunnel's config file
+  We should actually launch stunnel directly from the python script instead of configuring it for system-wide use.
+
+- Fix /etc/init.d/ifwatcher status
+  Returns is not running, which it is actually running... probably because of the prefix of the python interpreter in the cmdline
+
+- Implement a more robust cleanup on master
+  Master session is up Network connection to the ssh terminal is shutdown (killing putty without logout). It seems a ghost vtun using the ssh redirection still runs
+
+- Add the L2 setup in the user manual workflow
+  Today, if a L2-tunnel is up, we definitely need the secondary interface eth1 However, we will have to withdraw the DHCP server on eth1, and bridge to it. How should the master script be started (not from eth1). This is an advanced feature, so we can expect the operator to connect to eth0, run the master script from there (in background?), then connect to eth1 (maybe with a secondary Ethernet interface or secondary machine). There should maybe be an option when running the master script to switch to L2. In that case, dnsmasq should be stopped on eth1, and before, the script should make sure it is not being run from a terminal connected on eth1 (use the peer IP, check subnets)
+
+- On master: Issue a warning when a tunnel is already setup and secondary interface is updated
+  If a tunnel session is started with one secondary interface, and a D-Bus signal InterfaceAdded with a different interface name is received, we should issue a warning on the user session.
