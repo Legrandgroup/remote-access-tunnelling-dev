@@ -60,6 +60,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
     parser.add_argument('-t', '--session-time', type=int, dest='session_time', help='specify session duration (in seconds)', default=-1)
     parser.add_argument('-u', '--3g-uplink-dev', type=str, dest='uplink_dev_3g', help='use a pre-established 3G link on device dev', default=None)
+    parser.add_argument('-i', '--interface', type=str, dest='extremity_if', help='specify the network interface to which we will provide access via the tunnel session', default='eth0')
     parser.add_argument('-p', '--write-pid-file', dest='write_pid_file', action='store_true', help='write pid in file for daemonisation purpose', default=False)
 
     args = parser.parse_args()
@@ -108,10 +109,15 @@ and automates the typing of tundev shell commands from the tunnelling devices si
 
     while True:
         tunnel_mode = onsite_dev.run_get_tunnel_mode()
-        onsite_dev.send_lan_ip_address_for_iface('eth0')
+        onsite_dev.send_lan_ip_address_for_iface(args.extremity_if)
         onsite_dev.send_lan_dns_config()
         if args.uplink_dev_3g is None:
-            onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
+            if args.extremity_if.startswith('eth'):
+                onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
+            elif args.extremity_if.startswith('wlan'):
+                onsite_dev.run_set_tunnelling_dev_uplink_type('wlan')
+            else:
+                onsite_dev.run_set_tunnelling_dev_uplink_type('other')
         else:
             onsite_dev.run_set_tunnelling_dev_uplink_type('3g')
         
@@ -134,12 +140,13 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     logger.debug('Going to setup vtun tunnel in mode ' + tunnel_mode)
     vtun_client_config = onsite_dev.get_client_vtun_tunnel(tunnel_mode,
-                                                           extremity_if='eth0',
+                                                           extremity_if=args.extremity_if,   # This extremity_if is the external network interface (towards the customer LAN to which we will connect the tunnel session)
+                                                           lan_if=arg.extremity_if,   # This lan_if is the LAN network interface that allows to reach the Internet
                                                            vtun_server_hostname='127.0.0.1',
                                                            vtun_server_port=locally_redirected_vtun_server_port,
                                                            vtund_exec='/usr/sbin/vtund',
                                                            vtund_use_sudo=True,
-                                                           nat_to_external=(tunnel_mode == 'L3')   # Always use a NAT towards the LAN for onsite devices in L2 mode
+                                                           nat_to_external=(tunnel_mode == 'L3')   # Always use a NAT towards the LAN for onsite devices in L3 mode
                                                           )  # Returns a pythonvtunlib.client_vtun_tunnel object
     
     vtun_client = vtun_client_config.to_client_vtun_tunnel_object()

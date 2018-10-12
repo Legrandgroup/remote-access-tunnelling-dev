@@ -558,12 +558,13 @@ class TunnellingDev(object):
             config_dict[key]=value
         return config_dict
     
-    def get_client_vtun_tunnel(self, tunnel_mode, extremity_if, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtund_use_sudo = False, ping_use_sudo = False, vtun_connection_timeout = 20, nat_to_external = False):
+    def get_client_vtun_tunnel(self, tunnel_mode, extremity_if, lan_if, vtun_server_hostname, vtun_server_port, vtund_exec = None, vtund_use_sudo = False, ping_use_sudo = False, vtun_connection_timeout = 20, nat_to_external = False):
         """ Create a pythonvtunlib.client_vtun_tunnel object based on the configuration returned by the devshell command get_vtun_parameters
         
         If the vtun_parameters_dict provided by the internal call to self._get_vtun_parameters_as_dict() does not have (enough) information to build a client tunnel, an exception will be raised
         \param tunnel_mode The tunnel mode ('L2', 'L3' etc...)
-        \param extremity_if The external network interface (towards the support terminal for master, or toward the customer LAN for onsite)
+        \param extremity_if The external network interface (towards the support terminal for master, or towards the customer LAN for onsite)
+        \param lan_if The LAN network interface that allows to reach the Internet (eth0 is most cases, but could also be wlan0 if the device is connecting to the Internet via Wi-Fi)
         \param vtun_server_hostname The hostname to connect to (the vtund server)
         \param vtun_server_port The TCP port to use when connecting to the vtund server  
         \param vtund_exec (optional) The PATH to the vtund binary
@@ -576,7 +577,7 @@ class TunnellingDev(object):
         tunnel_name = 'tundev' + str(self._ssh_username)
         config_dict = self._get_vtun_parameters_as_dict()
         config_dict['nat_to_external'] = nat_to_external
-        config_dict['lan_interface'] = 'eth0'
+        config_dict['lan_if'] = lan_if
         config_dict['extremity_if'] = extremity_if
         if tunnel_mode == 'L2':
             config_dict['bridge_if'] = 'br0'
