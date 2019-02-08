@@ -56,6 +56,7 @@ if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser(description="This program automatically connects to a RDV server as an onsite device. \
 and automates the typing of tundev shell commands from the tunnelling devices side in order to setup a tunnel session", prog=progname)
+    parser.add_argument('-u', '--username', help='user account to use when connecting to the RDV server', required=True)
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
     parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
     parser.add_argument('-t', '--session-time', type=int, dest='session_time', help='specify session duration (in seconds)', default=-1)
@@ -88,7 +89,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         pid_file.write(str(os.getpid()))
         pid_file.close()
         
-    username = 'rpi1100'
+    username = args.username
     onsite_dev = OnsiteDev(username=username, logger=logger)
     
     if not args.uplink_dev_3g is None:  # We must add the specific route to the rdv server before we execute rdv_server_connect()
