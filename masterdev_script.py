@@ -218,6 +218,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.debug('Going to setup vtun tunnel in mode ' + tunnel_mode + ' with extremity interface ' + extremity_if)
     vtun_client_config = master_dev.get_client_vtun_tunnel(tunnel_mode,
                                                            extremity_if=extremity_if,
+                                                           lan_if='eth0',
                                                            vtun_server_hostname='127.0.0.1',
                                                            vtun_server_port=locally_redirected_vtun_server_port,
                                                            vtund_exec='/usr/sbin/vtund',
