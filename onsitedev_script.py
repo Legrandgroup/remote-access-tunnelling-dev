@@ -94,8 +94,8 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     username = args.username
     onsite_dev = OnsiteDev(username=username, logger=logger)
     
-    if not args.uplink_dev_3g is None:  # We must add the specific route to the rdv server before we execute rdv_server_connect()
-        onsite_dev.add_host_route(host_ip=onsite_dev.get_rdv_server(), iface=args.uplink_dev_3g, ip_use_sudo=True)
+    if not args.uplink_dev is None:  # We must add the specific route to the rdv server before we execute rdv_server_connect()
+        onsite_dev.add_host_route(host_ip=onsite_dev.get_rdv_server(), iface=args.uplink_dev, ip_use_sudo=True)
     
     msg = 'Connecting to RDV server'
     if args.with_stunnel:
@@ -114,7 +114,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         tunnel_mode = onsite_dev.run_get_tunnel_mode()
         onsite_dev.send_lan_ip_address_for_iface(args.extremity_if)
         onsite_dev.send_lan_dns_config()
-        if args.uplink_dev_3g is None:
+        if args.uplink_dev is None:
             if args.extremity_if.startswith('eth'):
                 onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
             elif args.extremity_if.startswith('wlan'):
