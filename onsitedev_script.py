@@ -144,7 +144,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.debug('Going to setup vtun tunnel in mode ' + tunnel_mode)
     vtun_client_config = onsite_dev.get_client_vtun_tunnel(tunnel_mode,
                                                            extremity_if=args.extremity_if,   # This extremity_if is the external network interface (towards the customer LAN to which we will connect the tunnel session)
-                                                           lan_if=arg.extremity_if,   # This lan_if is the LAN network interface that allows to reach the Internet
+                                                           lan_if=args.extremity_if,   # This lan_if is the LAN network interface that allows to reach the Internet
                                                            vtun_server_hostname='127.0.0.1',
                                                            vtun_server_port=locally_redirected_vtun_server_port,
                                                            vtund_exec='/usr/sbin/vtund',
