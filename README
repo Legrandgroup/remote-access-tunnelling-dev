@@ -38,3 +38,19 @@ The section below lists outstanding issues/features on this code:
 
 - On master: Issue a warning when a tunnel is already setup and secondary interface is updated
   If a tunnel session is started with one secondary interface, and a D-Bus signal InterfaceAdded with a different interface name is received, we should issue a warning on the user session.
+  
+- On the RDV server, add a log when a tunnel creation request is performed but the combination username/role is not provisionned inside the python code. On the remote RPI, we get an exception:
+  dbus.exceptions.DBusException: org.freedesktop.DBus.Python.Exception: Traceback (most recent call last):
+    File "/usr/lib/python2.7/dist-packages/dbus/service.py", line 707, in _message_cb
+      retval = candidate_method(self, *args, **keywords)
+    File "/opt/local/rdv-server-tundev-shell/vtun_manager.py", line 591, in RegisterTundevBinding
+      self._tundev_dict[username].vtunService.configure_service(mode=mode, lan_ip_str=lan_ip, lan_dns_str=lan_dns)
+    File "/opt/local/rdv-server-tundev-shell/vtun_manager.py", line 192, in configure_service
+      raise Exception('NoTunnelConfigFor:' + str(self.username))
+  Exception: NoTunnelConfigFor:rpi1112
+  But the RDV server admin would benefit from an equivalent log in the syslog (especially for onsite devs that connect automatically without logging the exception anywhere to the user)
+  
+- At least on onsite RPIs, also send hostname to the RDV and write this in the logs together with the rpi username (and also show this in the master when using -l).
+  One could also add the public IP address for the onsite network (use any getmyip API)
+  One could also add a configuration file somewhere on the RPI (in /etc/?). If it exists, and the user fills-in a human-friendly location (like "Royal Champagne") then this is also presented to the user... this prevents mistakenly connecting to the wrong RPI.
+
