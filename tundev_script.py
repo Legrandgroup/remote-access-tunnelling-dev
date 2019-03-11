@@ -13,7 +13,7 @@ import tempfile
 
 import ipaddr
 
-import socket, struct, fcntl    # For get_ip()
+import socket, struct, fcntl    # For TunnellingDev._get_ip_network() and TunnellingDev._get_hostname()
 
 import os
 import subprocess
@@ -98,6 +98,12 @@ class TunnellingDev(object):
                 if match:
                     nameservers+=[ipaddr.IPv4Address(match.group(1))]
         return nameservers
+    
+    def _get_hostname(self):
+        """ Get the hostname of the current machine
+        \return The hostname as a string
+        """
+        return socket.gethostname()
     
     def add_host_route(self, host_ip, iface, ip_use_sudo = False):
         """ Add a route to a specific host to the default routing table
