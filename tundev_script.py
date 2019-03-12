@@ -403,7 +403,7 @@ class TunnellingDev(object):
         self.run_set_tunnelling_dev_lan_ip_address(self._get_ip_network(iface=iface))
     
     def run_set_tunnelling_dev_dns_server_list(self, dns_list):
-        """ Run the command run_set_tunnelling_dev_dns_server_list on the remote tundev shell
+        """ Run the command set_tunnelling_dev_dns_server_list on the remote tundev shell
         \param dns_list a list of ipaddr.IPv4Network objects representing DNS servers to communicate to the RDV server
         """
         self.run_command('set_tunnelling_dev_dns_server_list ' + ' '.join(str(dns) for dns in dns_list))
@@ -412,7 +412,18 @@ class TunnellingDev(object):
         """ Send the DNS configuration for the current host to the remote tundev shell
         """
         self.run_set_tunnelling_dev_dns_server_list(self._get_linux_nameserver_list())
-
+    
+    def run_set_tunnelling_dev_hostname(self, hostname):
+        """ Run the command set_tunnelling_dev_hostname on the remote tundev shell
+        \param hostname The hostname string to send
+        """
+        self.run_command('set_tunnelling_dev_hostname \'' + hostname.encode('string_escape') + '\'')
+    
+    def send_tunnelling_dev_hostname(self):
+        """ Send the hostname string for the current host to the remote tundev shell
+        """
+        self.run_set_tunnelling_dev_hostname(self._get_hostname())
+    
     def run_get_role(self):
         """ Run the command get_role on the remote tundev shell
         \return The role as a string
