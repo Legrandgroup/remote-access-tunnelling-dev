@@ -114,6 +114,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         tunnel_mode = onsite_dev.run_get_tunnel_mode()
         onsite_dev.send_lan_ip_address_for_iface(args.extremity_if)
         onsite_dev.send_lan_dns_config()
+        onsite_dev.send_tunnelling_dev_hostname()
         if args.uplink_dev is None:
             if args.extremity_if.startswith('eth'):
                 onsite_dev.run_set_tunnelling_dev_uplink_type('lan')
