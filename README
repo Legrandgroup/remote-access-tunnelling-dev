@@ -9,7 +9,6 @@ The section below lists outstanding issues/features on this code:
   At startup, for example, try to ping localhost, if it fails, try to ping with sudo. If that succeeds, then set ping_use_sudo to True automatically.
   The manual workaround is currently detailed in the procedure in [INSTALL.md].
 
-
 - Handle tunnel-related processus cleanup (vtun) on the client side
   We could use the flock concept on a file lock grabbed by *_script.py processes.
   We would thus run a third Python (or shell) process, which, once the flock released, would verify that the vtun client has really been terminated.
@@ -25,7 +24,7 @@ The section below lists outstanding issues/features on this code:
 
 - Support Wi-Fi uplinks (automatic switchover between all uplinks modes) on onsite devs
 
-- Support LORA, Sigfox or NB-IoT hartbeats that onside devs send to the RDV server, so that we know they are alive even if connection is lost. Maybe add some diagnostics on uplink failure in heartbeat.
+- Support LORA, Sigfox or NB-IoT heartbeats that onside devs send to the RDV server, so that we know they are alive even if connection is lost. Maybe add some diagnostics on uplink failure in heartbeat.
 
 - Provide the DNS name or IP address of the RDV sever as an argument of scripts *dev_script.py
   Can easily be done using the rdv_server argument of OnsiteDev and MasterDev classes' constructors
@@ -35,6 +34,9 @@ The section below lists outstanding issues/features on this code:
 - Fix /etc/init.d/ifwatcher status
   Returns is not running, which it is actually running... probably because of the prefix of the python interpreter in the cmdline
 
+- Allow /etc/init.d/ifwatcher to catch and setup links that are already up at boot time (it seems today that the link must go up AFTER the script is run, or no configuration will be performed).
+  To work around this bug, just disconnect and reconnect your Ethernet cable from the USB to Ethernet adapter after the RPI has booted, to make sure the IP config and DHCP server are properly setup on the interface.
+
 - Implement a more robust cleanup on master
   Master session is up Network connection to the ssh terminal is shutdown (killing putty without logout). It seems a ghost vtun using the ssh redirection still runs
 
@@ -43,19 +45,13 @@ The section below lists outstanding issues/features on this code:
 
 - On master: Issue a warning when a tunnel is already setup and secondary interface is updated
   If a tunnel session is started with one secondary interface, and a D-Bus signal InterfaceAdded with a different interface name is received, we should issue a warning on the user session.
-  
-- On the RDV server, add a log when a tunnel creation request is performed but the combination username/role is not provisionned inside the python code. On the remote RPI, we get an exception:
-  dbus.exceptions.DBusException: org.freedesktop.DBus.Python.Exception: Traceback (most recent call last):
-    File "/usr/lib/python2.7/dist-packages/dbus/service.py", line 707, in _message_cb
-      retval = candidate_method(self, *args, **keywords)
-    File "/opt/local/rdv-server-tundev-shell/vtun_manager.py", line 591, in RegisterTundevBinding
-      self._tundev_dict[username].vtunService.configure_service(mode=mode, lan_ip_str=lan_ip, lan_dns_str=lan_dns)
-    File "/opt/local/rdv-server-tundev-shell/vtun_manager.py", line 192, in configure_service
-      raise Exception('NoTunnelConfigFor:' + str(self.username))
-  Exception: NoTunnelConfigFor:rpi1112
-  But the RDV server admin would benefit from an equivalent log in the syslog (especially for onsite devs that connect automatically without logging the exception anywhere to the user)
-  
+
 - At least on onsite RPIs, also send hostname to the RDV and write this in the logs together with the rpi username (and also show this in the master when using -l).
   One could also add the public IP address for the onsite network (use any getmyip API)
   One could also add a configuration file somewhere on the RPI (in /etc/?). If it exists, and the user fills-in a human-friendly location (like "Royal Champagne") then this is also presented to the user... this prevents mistakenly connecting to the wrong RPI.
 
+- When running masterdev_script.py or onsitedev_script.py, allow to specify the RDV server's IP address from the environment variables, with a command-line override (like username)
+
+- Auto-generate stunnel config from the python script and launch stunnel from this config at startup (rather than relying on this service to be configured and started beforehand)
+
+- Check the RDV server's stunnel TLS certificate, possibly on both server and tundev, using a dedicated common CA root (no self-signed certs).
