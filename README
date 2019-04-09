@@ -5,6 +5,11 @@ https://www.bwiki.bticino.it:8443/display/PRJACCESDISTANT/
 
 
 The section below lists outstanding issues/features on this code:
+- Avoid manually setting ping_use_sudo in the code to use sudo for pings instead of execution using the current user.
+  At startup, for example, try to ping localhost, if it fails, try to ping with sudo. If that succeeds, then set ping_use_sudo to True automatically.
+  The manual workaround is currently detailed in the procedure in [INSTALL.md].
+
+
 - Handle tunnel-related processus cleanup (vtun) on the client side
   We could use the flock concept on a file lock grabbed by *_script.py processes.
   We would thus run a third Python (or shell) process, which, once the flock released, would verify that the vtun client has really been terminated.
