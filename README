@@ -1,55 +1,20 @@
-This repository contains the scripts used on tunnelling devices (client or support devices), it is part of the remote access project.
-For more information about the remote access project, please consult the server-side repository at:
+This repository contains the scripts used on tunnelling devices of the remote access project (client or support devices), it is part of the remote access project.
+You should first have a read at the general overview of the remote access project at:
 https://github.com/Legrandgroup/remote-access-rdv-server
 
-The section below lists outstanding issues/features on this code:
-- Avoid manually setting ping_use_sudo in the code to use sudo for pings instead of execution using the current user.
-  At startup, for example, try to ping localhost, if it fails, try to ping with sudo. If that succeeds, then set ping_use_sudo to True automatically.
-  The manual workaround is currently detailed in the procedure in [INSTALL.md].
+# Disclaimer
 
-- Handle tunnel-related processus cleanup (vtun) on the client side
-  We could use the flock concept on a file lock grabbed by *_script.py processes.
-  We would thus run a third Python (or shell) process, which, once the flock released, would verify that the vtun client has really been terminated.
-  This could be implemented as a python library (in order to re-use this feature in the RDV server's watchdog)
+This remote access framework has been designed to get access to remotely installed devices, either setup at a customer premises or on a remotely connected LAN.
+Use of this code is at your own risk, please consult the [license file](LICENSE) for the terms and conditions.
 
-- Add a GUI (web) to allow controlling connection/disconnection bu the user
-  When a web browser is opened on the masterdev's terminal, and provided the RPI's IP address as URL, a simple control interface is displayed.
-  This interface shows: Status (uptime) List all connected onsite RPIs Select one onsite RPI and connect to it (this can thus fully replace the command-line version of the master)
+# How to setup remote access tunnelling devices
 
-- Add a mechanism to switch between routed and bridged modes
+See the [dedicated documentation](INSTALL.md)
 
-- Support 3G uplinks (automatic switchover between all uplink modes) on onsite devs
+# Manually playing with the tunnelling concepts of the remote access project
 
-- Support Wi-Fi uplinks (automatic switchover between all uplinks modes) on onsite devs
+If you just want to re-use the concepts of the remote access project without installing all the server and client code, you can have a look at some step-by-step documentation [on how to do it manually here](MANUAL_TESTS.md)
 
-- Support LORA, Sigfox or NB-IoT heartbeats that onside devs send to the RDV server, so that we know they are alive even if connection is lost. Maybe add some diagnostics on uplink failure in heartbeat.
+# Outstanding issues & features wishlist
 
-- Provide the DNS name or IP address of the RDV sever as an argument of scripts *dev_script.py
-  Can easily be done using the rdv_server argument of OnsiteDev and MasterDev classes' constructors
-  Works on direct SSH but much more difficult when using stunnel (tunnelled SSL 443 links) because the RDV server's IP address is then in stunnel's config file
-  We should actually launch stunnel directly from the python script instead of configuring it for system-wide use.
-
-- Fix /etc/init.d/ifwatcher status
-  Returns is not running, which it is actually running... probably because of the prefix of the python interpreter in the cmdline
-
-- Allow /etc/init.d/ifwatcher to catch and setup links that are already up at boot time (it seems today that the link must go up AFTER the script is run, or no configuration will be performed).
-  To work around this bug, just disconnect and reconnect your Ethernet cable from the USB to Ethernet adapter after the RPI has booted, to make sure the IP config and DHCP server are properly setup on the interface.
-
-- Implement a more robust cleanup on master
-  Master session is up Network connection to the ssh terminal is shutdown (killing putty without logout). It seems a ghost vtun using the ssh redirection still runs
-
-- Add the L2 setup in the user manual workflow
-  Today, if a L2-tunnel is up, we definitely need the secondary interface eth1 However, we will have to withdraw the DHCP server on eth1, and bridge to it. How should the master script be started (not from eth1). This is an advanced feature, so we can expect the operator to connect to eth0, run the master script from there (in background?), then connect to eth1 (maybe with a secondary Ethernet interface or secondary machine). There should maybe be an option when running the master script to switch to L2. In that case, dnsmasq should be stopped on eth1, and before, the script should make sure it is not being run from a terminal connected on eth1 (use the peer IP, check subnets)
-
-- On master: Issue a warning when a tunnel is already setup and secondary interface is updated
-  If a tunnel session is started with one secondary interface, and a D-Bus signal InterfaceAdded with a different interface name is received, we should issue a warning on the user session.
-
-- At least on onsite RPIs, also send hostname to the RDV and write this in the logs together with the rpi username (and also show this in the master when using -l).
-  One could also add the public IP address for the onsite network (use any getmyip API)
-  One could also add a configuration file somewhere on the RPI (in /etc/?). If it exists, and the user fills-in a human-friendly location (like "Royal Champagne") then this is also presented to the user... this prevents mistakenly connecting to the wrong RPI.
-
-- When running masterdev_script.py or onsitedev_script.py, allow to specify the RDV server's IP address from the environment variables, with a command-line override (like username)
-
-- Auto-generate stunnel config from the python script and launch stunnel from this config at startup (rather than relying on this service to be configured and started beforehand)
-
-- Check the RDV server's stunnel TLS certificate, possibly on both server and tundev, using a dedicated common CA root (no self-signed certs).
+See the file [TODO in this repository](TODO)
