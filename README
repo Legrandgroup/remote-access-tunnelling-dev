@@ -1,8 +1,6 @@
 This repository contains the scripts used on tunnelling devices (client or support devices), it is part of the remote access project.
-For more information about the remote access project, please consult the Confluence page:
-https://www.bwiki.bticino.it:8443/display/PRJACCESDISTANT/
-
-
+For more information about the remote access project, please consult the server-side repository at:
+https://github.com/Legrandgroup/remote-access-rdv-server
 
 The section below lists outstanding issues/features on this code:
 - Avoid manually setting ping_use_sudo in the code to use sudo for pings instead of execution using the current user.
