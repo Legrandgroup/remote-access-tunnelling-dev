@@ -145,19 +145,19 @@ If this connection works properly, you can directly run the automated tunnelling
 
 For a master RPI:
 ```
-cd ~/tunnelling-dev-scripts/
+cd ~/remote-access-tunnelling-dev/
 ./masterdev_script.py -d -l
 ```
 
 For an onsite RPI:
 ```
-cd ~/tunnelling-dev-scripts/
+cd ~/remote-access-tunnelling-dev/
 ./onsitedev_script.py -d
 ```
 
 Note: obviously, your RPI will need to have a working connection to the Internet, and in particular to the RDV server.
 
-For all command examples below, when using relative directories, we will now assume that we are running our commands from the current working directory `~/tunnelling-dev-scripts/` (as we did for the previous examples above).
+For all command examples below, when using relative directories, we will now assume that we are running our commands from the current working directory `~/remote-access-tunnelling-dev/` (as we did for the previous examples above).
 
 ### Making sure the ping command works!
 
@@ -222,7 +222,7 @@ If module iptable_nat is not automatically loaded on the onsite dev, it will nee
 
 While the section above was about running the onsite dev script manually, we will now automate this so that the onsite RPI will automatically connect to the RDV server, in an unattended way.
 
-The script `onsitedev_script.sh` (provided in the tunnelling-dev-scripts repository) allows to run an infinite try-over loop, that will continuously launch the python script `onsitedev_script.py`
+The script `onsitedev_script.sh` (provided in the remote-access-tunnelling-dev repository) allows to run an infinite try-over loop, that will continuously launch the python script `onsitedev_script.py`
 
 In `onsitedev_script.sh`, `onsitedev_script.py` is launched with argument `-p` so that its PID is dumped inside a temporary file. This option is used to allow stopping the onsitedev service.
 
