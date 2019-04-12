@@ -82,13 +82,17 @@ Note: This step can only be performed if there is no already installed distribut
 
 ### Fetching the remote access scripts
 
+# Software installation
+
+This software relies on [a library to drive vtun from python code](https://github.com/Legrandgroup/pythonvtunlib), that we will checkout inside a subfolder `pythonvtunlib` inside the sources.
+
 In the home directory of the Rapsberry (ususally `/home/pi`), get a copy of the remote access software.
 For example, using git, type:
 ```
 cd
-git clone https://git.bticino.it/scm/devsmrmtacc/tunnelling-dev-scripts.git
-cd tunnelling-dev-scripts/
-git clone https://git.bticino.it/scm/devsmrmtacc/pythonvtunlib.git
+git clone https://github.com/Legrandgroup/remote-access-tunnelling-dev.git
+cd remote-access-tunnelling-dev/
+git clone https://github.com/Legrandgroup/pythonvtunlib.git
 ```
 
 As you have probably noted, there are two nested repositories to clone.
