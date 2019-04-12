@@ -83,11 +83,13 @@ if __name__ == '__main__':
     DBUS_SERVICE_INTERFACE = 'com.legrandelectric.RemoteAccess.SecondaryIfWatcher'	# The name of the D-Bus service under which we will perform input/output on D-Bus
     
     username_env = os.getenv('MASTERDEV_USERNAME', None)	# By default, take username from environment
+    rdv_server_env = os.getenv('RDV_SERVER_HOSTNAME', None)       # By default, take RDV server hostname from environment
     
     # Parse arguments
     parser = argparse.ArgumentParser(description="This program automatically connects to a RDV server as a master device. \
 and automates the typing of tundev shell commands from the tunnelling devices side in order to setup a tunnel session", prog=progname)
     parser.add_argument('-u', '--username', help='user account to use when connecting to the RDV server (can also be provided using env var MASTERDEV_USERNAME)', required=(username_env is None), default=username_env)	# This will override environment if provided, if no environment variable is provided, this argument becomes mandatory
+    parser.add_argument('-R', '--rdv-server', dest='rdv_server', help='hostname or IP address for the RDV server to connect to (can also be provided using env var RDV_SERVER_HOSTNAME)', required=(rdv_server_env is None), default=rdv_server_env)       # This will override environment if provided, if no environment variable is provided, this argument becomes mandatory
     parser.add_argument('-d', '--debug', action='store_true', help='display debug info', default=False)
     parser.add_argument('-T', '--with-stunnel', dest='with_stunnel', action='store_true', help='connect to RDVServer throught local stunnel instead of directly through SSH', default=False)
     parser.add_argument('-l', '--list-onsite', dest='list_onsite', action='store_true', help='lists the currently available onsite devices')
@@ -115,7 +117,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.debug('Starting as PID ' + str(os.getpid()))
     
     username = args.username
-    master_dev = MasterDev(username=username, logger=logger)
+    master_dev = MasterDev(username=username, logger=logger, rdv_server=args.rdv_server)
     
     msg = 'Connecting to RDV server'
     if args.with_stunnel:
