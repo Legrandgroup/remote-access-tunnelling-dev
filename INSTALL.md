@@ -172,14 +172,14 @@ vtun_client_config = onsite_dev.get_client_vtun_tunnel(...)
 
 ### Configuring stunnel for encapsulating the SSH connection into a TLS session
 
-In order to configure stunnel (required for this encapsulation, create a file named ?/etc/stunnel/outgoing_rdv_remote.conf` that will contain:
+In order to configure stunnel (required for this encapsulation, create a file named `/etc/stunnel/outgoing_rdv_remote.conf` that will contain:
 ```
 [rdv_remote]
 client = yes
 accept = 222
 connect = <RDV_server_IP_address>:443
 ```
-Where <RDV_server_IP_address> should be replaced by the public IP address of the RDV server.
+Where <RDV_server_IP_address> should be replaced by the public IP address of the RDV server
 
 Once configured, restart stunnel:
 ```
@@ -195,7 +195,8 @@ If the service is not running, and on recent distros (based on systemctl), the f
 ```
 sudo systemctl status stunnel4.service
 ```
-Often, this might come from the needed activation of the stunnel service beforehand (please consult your distro manual, this often ends up into editing `/etc/defaults/stunnel` and add the following line:
+Getting `active (exited)` will tell you stunnel was actually not stared. You should see `active (running)` here.
+Often, this might come from the needed activation of the stunnel service beforehand (please consult your distro manual, this often ends up into editing `/etc/defaults/stunnel` or `/etc/defaults/stunnel4` and add the following line:
 ```
 ENABLED=1
 ```
