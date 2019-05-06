@@ -117,14 +117,19 @@ An RDV server account must now have been reserved and configured on the RDV serv
 The tunnelling device must now be configured to use the UNIX account, so that the scripts will authenticate using that account username.
 In order to do this, add a line in file `~/.profile`, that will set the appropriate environment variable:
 
-For a master RPI, for example, if the username created on the RDV server is `rpi1111`:
+For a master RPI, for example, if the username created on the RDV server is *rpi1111*:
 ```
 export MASTERDEV_USERNAME=rpi1111
 ```
 
-For an onsite RPI, , for example, if the username created on the RDV server is `rpi1108`:
+For an onsite RPI, , for example, if the username created on the RDV server is *rpi1108*:
 ```
 export ONSITEDEV_USERNAME=rpi1108
+```
+
+Also, add a line that will provide the IP address or hostname of the RDV server:
+```
+export RDV_SERVER_HOSTNAME=my.rdv.server.com
 ```
 
 Once these environment variables configured, close the current shell and reopen it. You should see this variable set in the new shell, check this by running:
@@ -136,9 +141,22 @@ printenv | grep _USERNAME=
 
 This step allows us to make sure that the public key of the RPI has been properly associated with a valid account on the RDV server.
 
-In the following example, we are testing that a RPI using username `rpi1111` can connect to a RDV server 88.23.6.77. From a terminal on the RPI, run:
+In the following example, we are testing that an onsite RPI can connect to the RDV server.
+`RDV_SERVER_HOSTNAME` has been set in `~/.profile` above and is now available as an environment variable to the shell.
+`ONSITEDEV_USERNAME` or `MASTERDEV_USERNAME` is also available as an environment variable.
+
+From a terminal on the onsite RPI, run:
 ```
-ssh rpi1111@88.23.6.77
+ssh $ONSITEDEV_USERNAME@$RDV_SERVER_HOSTNAME
+```
+For an onsite RPI using username *rpi1108* and a configured RDV server *my.rdv.server.com*, this is equivalent to:
+```
+ssh rpi1108@my.rdv.server.com
+```
+
+Or for a master RPI, run:
+```
+ssh $MASTERDEV_USERNAME@$RDV_SERVER_HOSTNAME
 ```
 
 If this connection works properly, you can directly run the automated tunnelling device script (first in directly over ssh, without stunnel, which may not work if your firewall drops outgoing ssh connections on port 22):
