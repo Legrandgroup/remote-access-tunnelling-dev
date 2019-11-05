@@ -107,6 +107,15 @@ ssh-keygen
 Copy the public key from the newly generated file in to the RDV server's allowed keys (`~/.ssh/authorized_hosts`) for the UNIX account associated with the tunnelling device. For this, please follow the related procedure on the RDV server instructions.
 (in those instructions, the content of the environment variable `KEY` that will be set on the RDV server has to be copied over  from the content of file `~/.ssh/id_rsa.pub` on the tunnelling device.
 
+### Generating an account on the RDV server
+
+For each tunnelling device (onsite or master) that is allowed to connect to the RDV server, a configuration first needs to be done on the RDV server itself.
+See the [related documentation for more information](https://github.com/Legrandgroup/remote-access-rdv-server/blob/master/INSTALL.md#account-creation).
+
+During this process a new username (UNIX account) will be created.
+
+In the examples below, we will assume that username *rpi1111* was created for the master RPI and *rpi1108* for the onsite RPI.
+
 ### Ajusting the IP address of the RDV server
 
 In the file `tundev_script.py`, you can modify the variable `PROTO_RDV_SERVER` and set it to the public IP address of the RDV server (it is the same IP address that will be configured in the stunnel config file below)
