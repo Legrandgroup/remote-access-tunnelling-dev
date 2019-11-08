@@ -117,7 +117,12 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     logger.debug('Starting as PID ' + str(os.getpid()))
     
     username = args.username
-    master_dev = MasterDev(username=username, logger=logger, rdv_server=args.rdv_server)
+    
+    if len(args.rdv_server.split(':') > 1):
+        # There was at least one ':' in the RDV server name, assume it is the TCP port number
+        raise Exception('TCPPortOverrideNotSupported')
+    
+    master_dev = MasterDev(username=username, logger=logger, rdv_server_host=args.rdv_server)
     
     msg = 'Connecting to RDV server'
     if args.with_stunnel:
