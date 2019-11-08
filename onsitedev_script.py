@@ -95,11 +95,14 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         
     username = args.username
     
+    rdv_server_host = args.rdv_server
+    rdv_server_tcp_port = None
     if len(args.rdv_server.split(':') > 1):
         # There was at least one ':' in the RDV server name, assume it is the TCP port number
-        raise Exception('TCPPortOverrideNotSupported')
+        rdv_server_host = args.rdv_server.split(':')[0]
+        rdv_server_tcp_port = int(args.rdv_server.split(':')[1])
     
-    onsite_dev = OnsiteDev(username=username, logger=logger, rdv_server_host=args.rdv_server)
+    onsite_dev = OnsiteDev(username=username, logger=logger, rdv_server_host=rdv_server_host, rdv_server_tcp_port=rdv_server_tcp_port)
     
     if not args.uplink_dev is None:  # We must add the specific route to the rdv server before we execute rdv_server_connect()
         onsite_dev.add_host_route(host_ip=onsite_dev.get_rdv_server(), iface=args.uplink_dev, ip_use_sudo=True)

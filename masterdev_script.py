@@ -118,11 +118,14 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     username = args.username
     
+    rdv_server_host = args.rdv_server
+    rdv_server_tcp_port = None
     if len(args.rdv_server.split(':') > 1):
         # There was at least one ':' in the RDV server name, assume it is the TCP port number
-        raise Exception('TCPPortOverrideNotSupported')
+        rdv_server_host = args.rdv_server.split(':')[0]
+        rdv_server_tcp_port = int(args.rdv_server.split(':')[1])
     
-    master_dev = MasterDev(username=username, logger=logger, rdv_server_host=args.rdv_server)
+    master_dev = OnsiteDev(username=username, logger=logger, rdv_server_host=rdv_server_host, rdv_server_tcp_port=rdv_server_tcp_port)
     
     msg = 'Connecting to RDV server'
     if args.with_stunnel:
