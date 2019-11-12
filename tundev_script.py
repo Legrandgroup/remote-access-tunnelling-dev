@@ -222,6 +222,10 @@ class TunnellingDev(object):
         
         # Now override values depending on whether we are in stunnel or direct mode
         if using_stunnel:
+            if ssh_remote_host == 'localhost' or ssh_remote_host == '127.0.0.1' or ssh_remote_host == '::1':
+                pass
+            else:
+                logger.warning('Host "' + ssh_remote_host + '" specified but using localhost instead because we are connecting in stunnel mode')
             ssh_remote_host = 'localhost'   # In stunnel mode, we will always connect to a local instance of stunnel
             if ssh_remote_tcp_port is None:
                 ssh_remote_tcp_port = 222   # If no port was specified, default to 222
