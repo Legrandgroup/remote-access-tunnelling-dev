@@ -120,7 +120,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     
     rdv_server_host = args.rdv_server
     rdv_server_tcp_port = None
-    if len(args.rdv_server.split(':') > 1):
+    if len(args.rdv_server.split(':')) > 1:
         # There was at least one ':' in the RDV server name, assume it is the TCP port number
         rdv_server_host = args.rdv_server.split(':')[0]
         rdv_server_tcp_port = int(args.rdv_server.split(':')[1])
@@ -131,7 +131,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
     if args.with_stunnel:
         msg += ' over an SSL tunnel'
     else:
-        msg += ' directly over SSH (' + str(master_dev.get_rdv_server()) + ')'
+        msg += ' directly over SSH (' + str(master_dev.get_rdv_server_host()) + ')'
     msg += ' as user account "' + username + '"'
     logger.info(msg)
     master_dev.rdv_server_connect(using_stunnel=args.with_stunnel)
