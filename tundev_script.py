@@ -215,7 +215,7 @@ class TunnellingDev(object):
         """
         
         if not self._ssh_key_filename is None:
-            logger.error('Providing a ssh key filename is not yet supported')
+            self.logger.error('Providing a ssh key filename is not yet supported')
             raise('SSHKeyFilenameNotSupported')
         ssh_remote_host = self._rdv_server_host
         ssh_remote_tcp_port = self._rdv_server_tcp_port
@@ -225,7 +225,7 @@ class TunnellingDev(object):
             if ssh_remote_host == 'localhost' or ssh_remote_host == '127.0.0.1' or ssh_remote_host == '::1':
                 pass
             else:
-                logger.warning('Host "' + ssh_remote_host + '" specified but using localhost instead because we are connecting in stunnel mode')
+                self.logger.warning('Host "' + ssh_remote_host + '" specified but using localhost instead because we are connecting in stunnel mode')
             ssh_remote_host = 'localhost'   # In stunnel mode, we will always connect to a local instance of stunnel
             if ssh_remote_tcp_port is None:
                 ssh_remote_tcp_port = 222   # If no port was specified, default to 222
