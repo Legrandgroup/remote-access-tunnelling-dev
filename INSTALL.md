@@ -99,7 +99,7 @@ As you have probably noted, there are two nested repositories to clone.
 
 ### Asymmetic ssh key generation
 
-Generate a public/private ssh key pair on the tunnelling device:
+Generate a public/private ssh key pair on the tunnelling device (as user pi):
 ```
 ssh-keygen
 ```
@@ -124,7 +124,7 @@ In the file `tundev_script.py`, you can modify the variable `PROTO_RDV_SERVER` a
 
 An RDV server account must now have been reserved and configured on the RDV server before continuing on these instructions. If this is not the case, please follow the related procedure on the RDV server instructions.
 The tunnelling device must now be configured to use the UNIX account, so that the scripts will authenticate using that account username.
-In order to do this, add a line in file `~/.profile`, that will set the appropriate environment variable:
+In order to do this, add a line in file `~/.profile` (as user pi), that will set the appropriate environment variable:
 
 For a master RPI, for example, if the username created on the RDV server is *rpi1111*:
 ```
@@ -154,7 +154,7 @@ In the following example, we are testing that an onsite RPI can connect to the R
 `RDV_SERVER_HOSTNAME` has been set in `~/.profile` above and is now available as an environment variable to the shell.
 `ONSITEDEV_USERNAME` or `MASTERDEV_USERNAME` is also available as an environment variable.
 
-From a terminal on the onsite RPI, run:
+From a terminal on the onsite RPI, as user pi, run:
 ```
 ssh $ONSITEDEV_USERNAME@$RDV_SERVER_HOSTNAME
 ```
@@ -163,7 +163,7 @@ For an onsite RPI using username *rpi1108* and a configured RDV server *my.rdv.s
 ssh rpi1108@my.rdv.server.com
 ```
 
-Or for a master RPI, run:
+Or for a master RPI, as user pi, run:
 ```
 ssh $MASTERDEV_USERNAME@$RDV_SERVER_HOSTNAME
 ```
@@ -232,7 +232,7 @@ ENABLED=1
 
 ### Manually testing the connection from an onsite dev
 
-In order to first test that an onsite dev properly connects to the RDV server, we will run the following command from a terminal on the RPI:
+In order to first test that an onsite dev properly connects to the RDV server, we will run the following command from a terminal on the RPI, as user pi:
 ```
 ./onsitedev_script.py -d
 ```
@@ -265,8 +265,8 @@ You will also have to double-check that the path set in variable `DAEMON`, insid
 
 As a first test, check that this init script starts and stop the service properly, using the following commands:
 ```
-/etc/init.d/onsitedevscript start
-/etc/init.d/onsitedevscript stop
+sudo /etc/init.d/onsitedevscript start
+sudo /etc/init.d/onsitedevscript stop
 ```
 
 Once this init script has proven to work properly, it can be automatically launched at boot time by running the following command:
@@ -468,7 +468,7 @@ We decided not to run update.rc.d or create symbolic links in /etc/rc?.d for thi
 
 ### Manually testing the connection from an master dev
 
-In order to first test that a master dev properly connects to the RDV server, we will run the following command from a terminal on the RPI:
+In order to first test that a master dev properly connects to the RDV server, we will run the following command from a terminal on the RPI, as user pi:
 ```
 ./masterdev_script.py -d
 ```
