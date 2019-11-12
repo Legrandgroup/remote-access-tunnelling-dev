@@ -24,20 +24,22 @@ from pythonvtunlib import client_vtun_tunnel
 
 class TunnellingDev(object):
     """ Class representing a tunnelling device
-    A tunnelling device is a abstract device gathering client devices or server devices
+    A tunnelling device is a abstract device from which client devices or server devices derive
     """
     
     SSH_ESCAPE_SHELL_PROMPT = 'ssh> '
                 
-    def __init__(self, username, logger, rdv_server, key_filename = None, prompt = None):
+    def __init__(self, username, logger, rdv_server_host, rdv_server_tcp_port = None, key_filename = None, prompt = None):
         """ Constructor
         \param username The username to use with ssh to connect to the RDV server
         \param logger A logging.Logger to use for log messages
-        \param rdv_server The hostname of IP address of the RDV server to connect to (this will only affect behaviour in direct (no -T) mode, for SSL tunnelled mode (-T), the IP address of the RDV server is configured in stunnel's config files)
+        \param rdv_server_host The hostname or IP address of the RDV server to connect to (this will only affect behaviour in direct (no -T) mode, for SSL tunnelled mode (-T), the IP address of the RDV server is configured in stunnel's config files)
+        \param rdv_server_tcp_port The TCP port used to open an ssh connection to the RDV server (optional, will defaut to 22 in direct (no -T) mode, and 222 SSL tunnelled mode (-T)
         \param key_filename A file containing the private key for key-based ssh authentication
         \param prompt The expected prompt (if None, will be built from the username) 
         """
-        self._rdv_server = rdv_server
+        self._rdv_server_host = rdv_server_host
+        self._rdv_server_tcp_port = rdv_server_tcp_port
         #self._ssh_connection = None
         self._ssh_username = username
         self._ssh_key_filename = key_filename
@@ -53,11 +55,17 @@ class TunnellingDev(object):
         self.ssh_l_supported = None # This attributes describes whether remote port forwarding is supported on the ssh session (ssh -L option)
         self.ssh_remote_tcp_port = None # This attribute contains the remote TCP port on which vtun is accessible on the remote machine (we will tunnel this into the existing ssh session) 
     
-    def get_rdv_server(self):
-        """ Get the RDV server tha this object is configured to connect to
+    def get_rdv_server_host(self):
+        """ Get the RDV server hostname or IP address that this object is configured to connect to
         \return A string containing the RDV server as a hostname or an IP address
         """
-        return self._rdv_server
+        return self._rdv_server_host
+    
+    def get_rdv_server_tcp_port(self):
+        """ Get the TCP port this object is configured to connect to
+        \return A TCP port integer
+        """
+        return self._rdv_server_tcp_port
     
     def _get_ip_network(self, iface = 'eth0'):
         """ Get the IPv4 address of the specified interface
@@ -207,12 +215,25 @@ class TunnellingDev(object):
         """
         
         if not self._ssh_key_filename is None:
-            logger.error('Providing a ssh key filename is not yet supported')
+            self.logger.error('Providing a ssh key filename is not yet supported')
             raise('SSHKeyFilenameNotSupported')
+        ssh_remote_host = self._rdv_server_host
+        ssh_remote_tcp_port = self._rdv_server_tcp_port
+        
+        # Now override values depending on whether we are in stunnel or direct mode
         if using_stunnel:
-            self._exp = pexpect.spawn('ssh', ['-oUserKnownHostsFile=/dev/null', '-oStrictHostKeyChecking=no', '-p 222', self._ssh_username + '@localhost'])
+            if ssh_remote_host == 'localhost' or ssh_remote_host == '127.0.0.1' or ssh_remote_host == '::1':
+                pass
+            else:
+                self.logger.warning('Host "' + ssh_remote_host + '" specified but using localhost instead because we are connecting in stunnel mode')
+            ssh_remote_host = 'localhost'   # In stunnel mode, we will always connect to a local instance of stunnel
+            if ssh_remote_tcp_port is None:
+                ssh_remote_tcp_port = 222   # If no port was specified, default to 222
         else:
-            self._exp = pexpect.spawn('ssh', ['-oUserKnownHostsFile=/dev/null', '-oStrictHostKeyChecking=no', self._ssh_username + '@' + self._rdv_server])
+            if ssh_remote_tcp_port is None:
+                ssh_remote_tcp_port = 22    # In no port was specified in direct mode, default to SSH default TCP port (22)
+        
+        self._exp = pexpect.spawn('ssh', ['-oUserKnownHostsFile=/dev/null', '-oStrictHostKeyChecking=no', '-oPort=' + str(ssh_remote_tcp_port), self._ssh_username + '@' + ssh_remote_host])
         supposedly_logged_in = False
         surely_logged_in = False
         
@@ -252,7 +273,7 @@ class TunnellingDev(object):
 #         """ Initiate the ssh connection to the RDV server """
 #         self._ssh_connection = paramiko.SSHClient()
 #         self._ssh_connection.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # FIXME: really check the server certificate
-#         self._ssh_connection.connect(self._rdv_server, username=self._ssh_username, key_filename=self._ssh_key_filename)
+#         self._ssh_connection.connect(self._rdv_server_host, username=self._ssh_username, key_filename=self._ssh_key_filename)
 
     def rdv_server_disconnect(self):
         """ Close the ssh connection to the RDV server if it is up """
