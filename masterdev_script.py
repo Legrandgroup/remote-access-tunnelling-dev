@@ -125,7 +125,7 @@ and automates the typing of tundev shell commands from the tunnelling devices si
         rdv_server_host = args.rdv_server.split(':')[0]
         rdv_server_tcp_port = int(args.rdv_server.split(':')[1])
     
-    master_dev = OnsiteDev(username=username, logger=logger, rdv_server_host=rdv_server_host, rdv_server_tcp_port=rdv_server_tcp_port)
+    master_dev = MasterDev(username=username, logger=logger, rdv_server_host=rdv_server_host, rdv_server_tcp_port=rdv_server_tcp_port)
     
     msg = 'Connecting to RDV server'
     if args.with_stunnel:
