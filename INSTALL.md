@@ -6,7 +6,7 @@ We initially start from a Raspberry PI device running Raspbian OS. We need a 4GB
 
 # Installation of required packages
 ```
-sudo apt-get install liblzo2-dev libssl-dev bison flex lsof tcpdump openssh-client python-ipaddr python-pexpect python-gobject bridge-utils stunnel4 python-dbus
+sudo apt-get install liblzo2-dev libssl-dev bison flex lsof tcpdump openssh-client python-ipaddr python-pexpect python-gobject bridge-utils stunnel4 python-dbus git
 ```
 
 # Overview of required software
