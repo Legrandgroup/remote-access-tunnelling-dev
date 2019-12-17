@@ -116,10 +116,6 @@ During this process a new username (UNIX account) will be created.
 
 In the examples below, we will assume that username *rpi1111* was created for the master RPI and *rpi1108* for the onsite RPI.
 
-### Ajusting the IP address of the RDV server
-
-In the file `tundev_script.py`, you can modify the variable `PROTO_RDV_SERVER` and set it to the public IP address of the RDV server (it is the same IP address that will be configured in the stunnel config file below)
-
 ### Customizing the script to use the account created on the RDV server
 
 An RDV server account must now have been reserved and configured on the RDV server before continuing on these instructions. If this is not the case, please follow the related procedure on the RDV server instructions.
