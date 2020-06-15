@@ -61,6 +61,10 @@ In order to recompile vtun, [download its source files from the official website
 
 We will use vtun-3.0.3
 
+Please note that Debian has a set of patches that can be interesting to make vtun work and to add features like IPv6 support.
+Please check [the debian source packages](https://packages.debian.org/search?keywords=vtun&searchon=sourcenames&suite=stable&section=all) for patches to apply to the official upstream vtun sources (see the debian/patches folder in the vtun_\*.debian.tar.xz source package archive for vtun).
+This also adds compatibility with recent versions of openssl and a few patches are also available as feature branches (currently not merged to master), that can be picked at https://github.com/VTun/VTun/network (for example a [patch on fork()]( https://github.com/VTun/VTun/commit/84b1b47ad5fbde9f77c6895a6d54793a5ad58953)).
+
 After decompressing the archive, compile vtun directly on the RPI:
 
 ```
